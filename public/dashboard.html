@@ -69,10 +69,7 @@
         <div class="nav-section" id="navResellerSection" style="display:none;">
           <div class="nav-section-title">Reseller</div>
           <a href="#" class="nav-link" data-page="my-balance">
-            <span class="icon">💳</span> ยอดค้างชำระ
-          </a>
-          <a href="#" class="nav-link" data-page="submit-payment">
-            <span class="icon">📤</span> แนบสลิปชำระ
+            <span class="icon">💳</span> ยอดค้าง & ชำระเงิน
           </a>
         </div>
 
@@ -561,41 +558,82 @@
         </div>
       </div>
 
-      <!-- My Balance Page (Reseller) -->
+      <!-- Reseller: Balance & Payment Page -->
       <div class="page hidden" id="page-my-balance">
         <div class="page-header">
           <h2>💳 ยอดค้างชำระ</h2>
-          <p>รายการซื้อและยอดค้างชำระ</p>
+          <p>รายการซื้อและชำระเงิน</p>
         </div>
 
-        <div class="stats-grid mb-20">
-          <div class="stat-card danger">
-            <div class="stat-value" id="balancePending">฿0</div>
-            <div class="stat-label">ยอดค้างชำระ</div>
-          </div>
-          <div class="stat-card success">
-            <div class="stat-value" id="balancePaid">฿0</div>
-            <div class="stat-label">ชำระแล้ว</div>
-          </div>
-        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; margin-bottom:24px;">
+          <!-- Left: Stats & History -->
+          <div>
+            <div class="stats-grid mb-20">
+              <div class="stat-card danger">
+                <div class="stat-value" id="balancePending">฿0</div>
+                <div class="stat-label">ยอดค้างชำระ</div>
+              </div>
+              <div class="stat-card success">
+                <div class="stat-value" id="balancePaid">฿0</div>
+                <div class="stat-label">ชำระแล้ว</div>
+              </div>
+            </div>
 
-        <div class="card">
-          <div class="card-body">
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ซับเมล</th>
-                    <th>แพ็ก</th>
-                    <th>ราคา</th>
-                    <th>สถานะ</th>
-                    <th>วันที่</th>
-                  </tr>
-                </thead>
-                <tbody id="balanceTable">
-                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
-                </tbody>
-              </table>
+            <div class="card">
+              <div class="card-header">
+                <h3>📋 ประวัติการซื้อ</h3>
+              </div>
+              <div class="card-body" style="max-height:400px;overflow-y:auto;">
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ซับเมล</th>
+                        <th>แพ็ก</th>
+                        <th>ราคา</th>
+                        <th>สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="balanceTable">
+                      <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Payment Form -->
+          <div>
+            <div class="card" id="submitPaymentCard">
+              <div class="card-header">
+                <h3>📤 แนบสลิปชำระเงิน</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>💰 ยอดที่ต้องชำระ</label>
+                  <div style="font-size:2rem;font-weight:800;color:var(--danger);margin:10px 0;" id="submitPaymentAmount">฿0</div>
+                </div>
+
+                <div class="form-group">
+                  <label>🏦 บัญชีปลายทาง</label>
+                  <div style="background:var(--bg-input);padding:16px;border-radius:12px;">
+                    <p><strong>ธนาคาร:</strong> <span id="bankNameDisplay">-</span></p>
+                    <p><strong>เลขบัญชี:</strong> <code id="bankAccountDisplay" style="font-size:1.1rem;">-</code></p>
+                    <p><strong>ชื่อบัญชี:</strong> <span id="bankAccountNameDisplay">-</span></p>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>📷 แนบรูปสลิป</label>
+                  <input type="file" class="form-control" id="slipImageInput" accept="image/*" onchange="previewSlip(this)">
+                  <div id="slipPreview" style="margin-top:10px;display:none;">
+                    <img id="slipPreviewImg" style="max-width:100%;border-radius:8px;">
+                  </div>
+                </div>
+
+                <button class="btn btn-success btn-block" onclick="submitResellerPayment()">✅ ยืนยันการชำระเงิน</button>
+              </div>
             </div>
           </div>
         </div>
@@ -768,44 +806,6 @@
         </div>
       </div>
 
-      <!-- Reseller: Submit Payment Page -->
-      <div class="page hidden" id="page-submit-payment">
-        <div class="page-header">
-          <h2>📤 แนบสลิปชำระเงิน</h2>
-          <p>ชำระยอดค้างทั้งหมด</p>
-        </div>
-
-        <div class="stats-grid mb-20" style="max-width:500px;">
-          <div class="stat-card danger">
-            <div class="stat-value" id="submitPaymentAmount">฿0</div>
-            <div class="stat-label">ยอดค้างชำระ</div>
-          </div>
-        </div>
-
-        <div class="card" style="max-width:500px;" id="submitPaymentCard">
-          <div class="card-body">
-            <div class="form-group">
-              <label>ข้อมูลโอนเงิน</label>
-              <div id="bankAccountInfo" style="background:var(--dark);padding:15px;border-radius:8px;margin-bottom:15px;">
-                <p><strong>ธนาคาร:</strong> <span id="bankNameDisplay">-</span></p>
-                <p><strong>เลขบัญชี:</strong> <code id="bankAccountDisplay">-</code></p>
-                <p><strong>ชื่อบัญชี:</strong> <span id="bankAccountNameDisplay">-</span></p>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>แนบรูปสลิป</label>
-              <input type="file" class="form-control" id="slipImageInput" accept="image/*" onchange="previewSlip(this)">
-              <div id="slipPreview" style="margin-top:10px;display:none;">
-                <img id="slipPreviewImg" style="max-width:100%;border-radius:8px;">
-              </div>
-            </div>
-
-            <button class="btn btn-success btn-block" onclick="submitResellerPayment()">✅ ยืนยันการชำระเงิน</button>
-          </div>
-        </div>
-      </div>
-
       <!-- Owner: Bank Settings Page -->
       <div class="page hidden" id="page-bank-settings">
         <div class="page-header">
@@ -959,7 +959,6 @@
         case 'expiring': loadExpiring(); break;
         case 'my-commission': loadMyCommission(); break;
         case 'my-balance': loadMyBalance(); break;
-        case 'submit-payment': loadSubmitPayment(); break;
         case 'admins': loadAdmins(); break;
         case 'packages': loadPackages(); break;
         case 'commissions': loadCommissions(); break;
@@ -2263,27 +2262,37 @@ sub2@example.com:password2"></textarea>
 
     // =============== MY BALANCE (RESELLER) ===============
     async function loadMyBalance() {
+      // Load balance stats
       const balanceData = await apiGet('/api/reseller/balance');
       if (balanceData.success) {
         document.getElementById('balancePending').textContent = '฿' + balanceData.pending.toLocaleString();
         document.getElementById('balancePaid').textContent = '฿' + balanceData.paid.toLocaleString();
+        document.getElementById('submitPaymentAmount').textContent = '฿' + balanceData.pending.toLocaleString();
       }
 
+      // Load bank account info
+      const bankData = await apiGet('/api/bank-account', false);
+      if (bankData.success && bankData.bankAccount) {
+        document.getElementById('bankNameDisplay').textContent = bankData.bankAccount.bankName || '-';
+        document.getElementById('bankAccountDisplay').textContent = bankData.bankAccount.accountNumber || '-';
+        document.getElementById('bankAccountNameDisplay').textContent = bankData.bankAccount.accountName || '-';
+      }
+
+      // Load transactions
       const txnData = await apiGet('/api/reseller/transactions');
       const tbody = document.getElementById('balanceTable');
 
       if (txnData.success && txnData.transactions.length > 0) {
         tbody.innerHTML = txnData.transactions.map(t => `
           <tr>
-            <td><code>${t.subEmail}</code></td>
+            <td><code style="font-size:0.8rem;">${t.subEmail}</code></td>
             <td>${t.packageDays} วัน</td>
             <td>฿${t.amount.toLocaleString()}</td>
             <td><span class="badge ${t.status === 'paid' ? 'badge-success' : 'badge-danger'}">${t.status === 'paid' ? 'ชำระแล้ว' : 'ค้างชำระ'}</span></td>
-            <td>${formatDate(t.createdAt)}</td>
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีรายการ</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีรายการ</td></tr>';
       }
     }
 
@@ -2706,32 +2715,6 @@ sub2@example.com:password2"></textarea>
         `${i + 1}.\nEmail: ${o.email}\nPassword: ${o.password}`
       ).join('\n\n');
       navigator.clipboard.writeText(text).then(() => showToast('คัดลอกแล้ว!', 'success'));
-    }
-
-    // =============== RESELLER: SUBMIT PAYMENT ===============
-    async function loadSubmitPayment() {
-      // Load unpaid amount
-      const unpaidData = await apiGet('/api/reseller/unpaid');
-      if (unpaidData.success) {
-        document.getElementById('submitPaymentAmount').textContent = '฿' + (unpaidData.unpaidAmount || 0).toLocaleString();
-
-        if (unpaidData.unpaidAmount === 0) {
-          document.getElementById('submitPaymentCard').innerHTML = `
-            <div class="empty-state">
-              <div class="icon">✅</div>
-              <h3>ไม่มียอดค้างชำระ</h3>
-            </div>
-          `;
-        }
-      }
-
-      // Load bank account
-      const bankData = await apiGet('/api/bank-account', false);
-      if (bankData.success && bankData.bankAccount) {
-        document.getElementById('bankNameDisplay').textContent = bankData.bankAccount.bankName || '-';
-        document.getElementById('bankAccountDisplay').textContent = bankData.bankAccount.accountNumber || '-';
-        document.getElementById('bankAccountNameDisplay').textContent = bankData.bankAccount.accountName || '-';
-      }
     }
 
     function previewSlip(input) {
