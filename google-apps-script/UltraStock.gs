@@ -810,13 +810,14 @@ function getOrders(userId, role, filter, saleType) {
   const data = sheet.getDataRange().getValues();
 
   // Also get SubEmails sheet for password lookup
+  // Columns: [0]=Id, [1]=MainEmailId, [2]=Email, [3]=Password, [4]=Status
   const subSheet = getSheet(SHEETS.SUB_EMAILS);
   const subData = subSheet.getDataRange().getValues();
   const subEmailMap = {};
   for (let i = 1; i < subData.length; i++) {
     subEmailMap[subData[i][0]] = {
-      email: subData[i][1],
-      password: subData[i][2]
+      email: subData[i][2],    // Email column
+      password: subData[i][3]  // Password column
     };
   }
 
