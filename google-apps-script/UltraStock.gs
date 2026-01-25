@@ -4,14 +4,16 @@
 
 // Sheet Names
 const SHEETS = {
-  ADMINS: 'Admins',
+  ADMINS: 'Admins',           // เก็บ users ทุก role (owner, super_admin, admin, reseller, customer)
   MAIN_EMAILS: 'MainEmails',
   SUB_EMAILS: 'SubEmails',
   ORDERS: 'Orders',
   TRANSACTIONS: 'Transactions',
   COMMISSION_LOG: 'CommissionLog',
   PACKAGES: 'Packages',
-  SETTINGS: 'Settings'
+  SETTINGS: 'Settings',
+  PAYMENT_LOGS: 'PaymentLogs',       // บันทึกการชำระเงิน + SlipRef ป้องกันสลิปซ้ำ
+  PENDING_ORDERS: 'PendingOrders'    // รอชำระ (สำหรับ Customer)
 };
 
 // Get Spreadsheet
@@ -35,14 +37,16 @@ function getSheet(sheetName) {
 // Initialize Sheet with Headers
 function initializeSheet(sheet, sheetName) {
   const headers = {
-    [SHEETS.ADMINS]: ['Id', 'Username', 'Password', 'Role', 'Permissions', 'Commissions', 'Balance', 'CreatedAt'],
+    [SHEETS.ADMINS]: ['Id', 'Username', 'Password', 'Role', 'Permissions', 'Commissions', 'Balance', 'CreatedAt', 'Name', 'Phone', 'LineId'],
     [SHEETS.MAIN_EMAILS]: ['Id', 'Email', 'Password', 'Capacity', 'CreatedAt', 'CreatedBy'],
     [SHEETS.SUB_EMAILS]: ['Id', 'MainEmailId', 'Email', 'Password', 'Status', 'CreatedAt', 'CreatedBy'],
-    [SHEETS.ORDERS]: ['Id', 'SubEmailId', 'SubEmail', 'AdminId', 'AdminName', 'CustomerName', 'PackageDays', 'SoldAt', 'ExpiresAt', 'SaleType', 'CommissionAmount', 'Status', 'Remark'],
-    [SHEETS.TRANSACTIONS]: ['Id', 'ResellerId', 'ResellerName', 'OrderId', 'SubEmail', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'PaidAt'],
-    [SHEETS.COMMISSION_LOG]: ['Id', 'AdminId', 'AdminName', 'OrderId', 'SubEmail', 'PackageDays', 'Amount', 'CreatedAt'],
-    [SHEETS.PACKAGES]: ['Id', 'Name', 'Days', 'Price', 'Active'],
-    [SHEETS.SETTINGS]: ['Key', 'Value']
+    [SHEETS.ORDERS]: ['Id', 'SubEmailId', 'SubEmail', 'AdminId', 'AdminName', 'CustomerName', 'PackageDays', 'SoldAt', 'ExpiresAt', 'SaleType', 'CommissionAmount', 'Status', 'Remark', 'BatchOrderId'],
+    [SHEETS.TRANSACTIONS]: ['Id', 'UserId', 'UserName', 'OrderId', 'SubEmail', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'PaidAt', 'SlipRef', 'Type'],
+    [SHEETS.COMMISSION_LOG]: ['Id', 'AdminId', 'AdminName', 'OrderId', 'SubEmail', 'PackageDays', 'Amount', 'CreatedAt', 'Type'],
+    [SHEETS.PACKAGES]: ['Id', 'Name', 'Days', 'ResellerPrice', 'CustomerPrice', 'Active'],
+    [SHEETS.SETTINGS]: ['Key', 'Value'],
+    [SHEETS.PAYMENT_LOGS]: ['Id', 'UserId', 'UserName', 'UserRole', 'Amount', 'SlipRef', 'Status', 'VerifiedAt', 'TransactionIds'],
+    [SHEETS.PENDING_ORDERS]: ['Id', 'UserId', 'UserName', 'SubEmailIds', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'ExpiresAt', 'PaidAt', 'SlipRef']
   };
 
   if (headers[sheetName]) {
@@ -66,12 +70,12 @@ function initializeSheet(sheet, sheetName) {
     sheet.appendRow(defaultOwner);
   }
 
-  // Initialize default packages
+  // Initialize default packages (ResellerPrice, CustomerPrice)
   if (sheetName === SHEETS.PACKAGES) {
     const defaultPackages = [
-      [generateId(), '7 วัน', 7, 500, true],
-      [generateId(), '20 วัน', 20, 500, true],
-      [generateId(), '30 วัน', 30, 500, true]
+      [generateId(), '7 วัน', 7, 500, 799, true],
+      [generateId(), '20 วัน', 20, 500, 799, true],
+      [generateId(), '30 วัน', 30, 500, 799, true]
     ];
     defaultPackages.forEach(pkg => sheet.appendRow(pkg));
   }
@@ -81,7 +85,10 @@ function initializeSheet(sheet, sheetName) {
     const defaultSettings = [
       ['telegramBotToken', ''],
       ['telegramChatId', ''],
-      ['notifyDaysBefore', '3']
+      ['notifyDaysBefore', '3'],
+      ['bankName', 'ธ.ไทยพาณิชย์'],
+      ['bankAccountNumber', '7122556905'],
+      ['bankAccountName', 'จิณณวัตร ไทยพุทรา']
     ];
     defaultSettings.forEach(s => sheet.appendRow(s));
   }
@@ -103,7 +110,9 @@ function doPost(e) {
     switch (action) {
       // Auth
       case 'login': result = login(data.username, data.password); break;
+      case 'register': result = registerUser(data); break;
       case 'getUser': result = getUser(data.userId); break;
+      case 'resetUserPassword': result = resetUserPassword(data.userId, data.newPassword); break;
 
       // Dashboard
       case 'getDashboardStats': result = getDashboardStats(data.userId, data.role); break;
@@ -153,6 +162,28 @@ function doPost(e) {
       case 'getSettings': result = getSettings(); break;
       case 'updateSettings': result = updateSettings(data); break;
 
+      // Bank Account
+      case 'getBankAccount': result = getBankAccount(); break;
+      case 'updateBankAccount': result = updateBankAccount(data); break;
+
+      // Payment (EasySlip)
+      case 'checkDuplicateSlip': result = checkDuplicateSlip(data.slipRef); break;
+      case 'savePaymentLog': result = savePaymentLog(data); break;
+      case 'getResellerUnpaidAmount': result = getResellerUnpaidAmount(data.userId); break;
+      case 'markResellerTransactionsPaid': result = markResellerTransactionsPaid(data); break;
+
+      // Customer Pending Orders
+      case 'createPendingOrder': result = createPendingOrder(data); break;
+      case 'getPendingOrders': result = getPendingOrders(data.userId); break;
+      case 'completePendingOrder': result = completePendingOrder(data); break;
+      case 'cancelPendingOrder': result = cancelPendingOrder(data.orderId); break;
+
+      // Renewal
+      case 'renewOrder': result = renewOrder(data); break;
+
+      // Enhanced Dashboard Stats
+      case 'getDashboardStatsEnhanced': result = getDashboardStatsEnhanced(data); break;
+
       default:
         result = { success: false, error: 'Unknown action: ' + action };
     }
@@ -183,13 +214,30 @@ function login(username, password) {
           username: data[i][1],
           role: data[i][3],
           permissions: tryParseJSON(data[i][4], {}),
-          commissions: tryParseJSON(data[i][5], {})
+          commissions: tryParseJSON(data[i][5], {}),
+          name: data[i][8] || '',
+          phone: data[i][9] || '',
+          lineId: data[i][10] || ''
         }
       };
     }
   }
 
   return { success: false, error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
+}
+
+function resetUserPassword(userId, newPassword) {
+  const sheet = getSheet(SHEETS.ADMINS);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === userId) {
+      sheet.getRange(i + 1, 3).setValue(newPassword);
+      return { success: true, message: 'รีเซ็ตรหัสผ่านสำเร็จ' };
+    }
+  }
+
+  return { success: false, error: 'ไม่พบผู้ใช้' };
 }
 
 function getUser(userId) {
@@ -1036,8 +1084,9 @@ function getPackages() {
       id: data[i][0],
       name: data[i][1],
       days: data[i][2],
-      price: data[i][3],
-      active: data[i][4]
+      resellerPrice: data[i][3],
+      customerPrice: data[i][4],
+      active: data[i][5]
     });
   }
 
@@ -1059,7 +1108,8 @@ function savePackages(packages) {
       pkg.id || generateId(),
       pkg.name,
       pkg.days,
-      pkg.price,
+      pkg.resellerPrice || pkg.price || 0,
+      pkg.customerPrice || pkg.price || 0,
       pkg.active !== false
     ]);
   }
@@ -1372,4 +1422,620 @@ function tryParseJSON(str, defaultValue) {
   } catch (e) {
     return defaultValue;
   }
+}
+
+// =============== REGISTRATION ===============
+
+function registerUser(data) {
+  const { username, password, name, phone, lineId } = data;
+
+  if (!username || !password) {
+    return { success: false, error: 'กรุณากรอก username และ password' };
+  }
+
+  const sheet = getSheet(SHEETS.ADMINS);
+  const allData = sheet.getDataRange().getValues();
+
+  // Check duplicate username
+  for (let i = 1; i < allData.length; i++) {
+    if (allData[i][1] === username) {
+      return { success: false, error: 'Username นี้ถูกใช้งานแล้ว' };
+    }
+  }
+
+  const userId = generateId();
+  const now = new Date().toISOString();
+
+  // New user gets 'customer' role by default
+  sheet.appendRow([
+    userId,
+    username,
+    password,
+    'customer',  // Default role
+    JSON.stringify({}),  // Permissions
+    JSON.stringify({}),  // Commissions
+    0,  // Balance
+    now,
+    name || '',
+    phone || '',
+    lineId || ''
+  ]);
+
+  return {
+    success: true,
+    message: 'สมัครสมาชิกสำเร็จ',
+    user: {
+      id: userId,
+      username,
+      role: 'customer',
+      name: name || ''
+    }
+  };
+}
+
+// =============== BANK ACCOUNT ===============
+
+function getBankAccount() {
+  const sheet = getSheet(SHEETS.SETTINGS);
+  const data = sheet.getDataRange().getValues();
+
+  let bankName = 'ธ.ไทยพาณิชย์';
+  let accountNumber = '7122556905';
+  let accountName = 'จิณณวัตร ไทยพุทรา';
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === 'bankName') bankName = data[i][1] || bankName;
+    if (data[i][0] === 'bankAccountNumber') accountNumber = data[i][1] || accountNumber;
+    if (data[i][0] === 'bankAccountName') accountName = data[i][1] || accountName;
+  }
+
+  return {
+    success: true,
+    bankAccount: { bankName, accountNumber, accountName }
+  };
+}
+
+function updateBankAccount(data) {
+  const { bankName, accountNumber, accountName } = data;
+  const sheet = getSheet(SHEETS.SETTINGS);
+  const allData = sheet.getDataRange().getValues();
+
+  const updates = {
+    'bankName': bankName,
+    'bankAccountNumber': accountNumber,
+    'bankAccountName': accountName
+  };
+
+  for (const [key, value] of Object.entries(updates)) {
+    let found = false;
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][0] === key) {
+        sheet.getRange(i + 1, 2).setValue(value);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      sheet.appendRow([key, value]);
+    }
+  }
+
+  return { success: true, message: 'อัพเดทข้อมูลธนาคารสำเร็จ' };
+}
+
+// =============== PAYMENT LOGS (ป้องกันสลิปซ้ำ) ===============
+
+function checkDuplicateSlip(slipRef) {
+  if (!slipRef) {
+    return { success: true, isDuplicate: false };
+  }
+
+  const sheet = getSheet(SHEETS.PAYMENT_LOGS);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][5] === slipRef) {  // SlipRef column
+      return { success: true, isDuplicate: true };
+    }
+  }
+
+  return { success: true, isDuplicate: false };
+}
+
+function savePaymentLog(data) {
+  const { userId, userName, userRole, amount, slipRef, status, transactionIds } = data;
+
+  const sheet = getSheet(SHEETS.PAYMENT_LOGS);
+  const logId = generateId();
+  const now = new Date().toISOString();
+
+  sheet.appendRow([
+    logId,
+    userId,
+    userName,
+    userRole,
+    amount,
+    slipRef,
+    status,
+    now,
+    JSON.stringify(transactionIds || [])
+  ]);
+
+  return { success: true, logId };
+}
+
+// =============== RESELLER PAYMENT ===============
+
+function getResellerUnpaidAmount(userId) {
+  const sheet = getSheet(SHEETS.TRANSACTIONS);
+  const data = sheet.getDataRange().getValues();
+
+  let unpaidAmount = 0;
+  const unpaidTransactions = [];
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === userId && data[i][7] !== 'paid') {
+      unpaidAmount += Number(data[i][6]) || 0;
+      unpaidTransactions.push({
+        id: data[i][0],
+        orderSubEmail: data[i][4],
+        packageDays: data[i][5],
+        amount: data[i][6],
+        createdAt: data[i][8]
+      });
+    }
+  }
+
+  return {
+    success: true,
+    unpaidAmount,
+    unpaidTransactions
+  };
+}
+
+function markResellerTransactionsPaid(data) {
+  const { transactionIds, slipRef, paidAt } = data;
+
+  const sheet = getSheet(SHEETS.TRANSACTIONS);
+  const allData = sheet.getDataRange().getValues();
+
+  let updatedCount = 0;
+
+  for (let i = 1; i < allData.length; i++) {
+    if (transactionIds.includes(allData[i][0])) {
+      sheet.getRange(i + 1, 8).setValue('paid');  // Status
+      sheet.getRange(i + 1, 10).setValue(paidAt); // PaidAt
+      sheet.getRange(i + 1, 11).setValue(slipRef); // SlipRef
+      updatedCount++;
+    }
+  }
+
+  return { success: true, updatedCount };
+}
+
+// =============== CUSTOMER PENDING ORDERS ===============
+
+function createPendingOrder(data) {
+  const { userId, userName, subEmailIds, packageDays, amount } = data;
+
+  const sheet = getSheet(SHEETS.PENDING_ORDERS);
+  const orderId = generateId();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes to pay
+
+  sheet.appendRow([
+    orderId,
+    userId,
+    userName,
+    JSON.stringify(subEmailIds),
+    packageDays,
+    amount,
+    'pending',
+    now.toISOString(),
+    expiresAt.toISOString(),
+    '',
+    ''
+  ]);
+
+  return {
+    success: true,
+    orderId,
+    amount,
+    expiresAt: expiresAt.toISOString()
+  };
+}
+
+function getPendingOrders(userId) {
+  const sheet = getSheet(SHEETS.PENDING_ORDERS);
+  const data = sheet.getDataRange().getValues();
+
+  const orders = [];
+  const now = new Date();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === userId && data[i][6] === 'pending') {
+      const expiresAt = new Date(data[i][8]);
+      if (expiresAt > now) {
+        orders.push({
+          id: data[i][0],
+          subEmailIds: tryParseJSON(data[i][3], []),
+          packageDays: data[i][4],
+          amount: data[i][5],
+          createdAt: data[i][7],
+          expiresAt: data[i][8]
+        });
+      }
+    }
+  }
+
+  return { success: true, orders };
+}
+
+function completePendingOrder(data) {
+  const { orderId, slipRef } = data;
+
+  const pendingSheet = getSheet(SHEETS.PENDING_ORDERS);
+  const pendingData = pendingSheet.getDataRange().getValues();
+
+  let pendingOrder = null;
+  let pendingRow = -1;
+
+  for (let i = 1; i < pendingData.length; i++) {
+    if (pendingData[i][0] === orderId && pendingData[i][6] === 'pending') {
+      pendingOrder = {
+        userId: pendingData[i][1],
+        userName: pendingData[i][2],
+        subEmailIds: tryParseJSON(pendingData[i][3], []),
+        packageDays: pendingData[i][4],
+        amount: pendingData[i][5]
+      };
+      pendingRow = i + 1;
+      break;
+    }
+  }
+
+  if (!pendingOrder) {
+    return { success: false, error: 'ไม่พบคำสั่งซื้อหรือหมดอายุแล้ว' };
+  }
+
+  // Create actual orders
+  const orderResult = createOrder({
+    subEmailIds: pendingOrder.subEmailIds,
+    packageDays: pendingOrder.packageDays,
+    customerName: pendingOrder.userName,
+    saleType: 'customer',
+    adminId: pendingOrder.userId,
+    adminRole: 'customer'
+  });
+
+  if (!orderResult.success) {
+    return orderResult;
+  }
+
+  // Mark pending order as completed
+  pendingSheet.getRange(pendingRow, 7).setValue('completed');
+  pendingSheet.getRange(pendingRow, 10).setValue(new Date().toISOString());
+  pendingSheet.getRange(pendingRow, 11).setValue(slipRef);
+
+  return {
+    success: true,
+    message: 'ชำระเงินสำเร็จ',
+    orders: orderResult.orders
+  };
+}
+
+function cancelPendingOrder(orderId) {
+  const sheet = getSheet(SHEETS.PENDING_ORDERS);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === orderId) {
+      sheet.getRange(i + 1, 7).setValue('cancelled');
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'ไม่พบคำสั่งซื้อ' };
+}
+
+// =============== RENEWAL ===============
+
+function renewOrder(data) {
+  const { orderId, packageDays, userId, userRole, slipRef } = data;
+
+  const ordersSheet = getSheet(SHEETS.ORDERS);
+  const ordersData = ordersSheet.getDataRange().getValues();
+
+  let orderRow = -1;
+  let orderInfo = null;
+
+  for (let i = 1; i < ordersData.length; i++) {
+    if (ordersData[i][0] === orderId) {
+      orderRow = i + 1;
+      orderInfo = {
+        subEmailId: ordersData[i][1],
+        subEmail: ordersData[i][2],
+        adminId: ordersData[i][3],
+        adminName: ordersData[i][4],
+        currentExpiry: new Date(ordersData[i][8])
+      };
+      break;
+    }
+  }
+
+  if (!orderInfo) {
+    return { success: false, error: 'ไม่พบ Order' };
+  }
+
+  // Get package price
+  const packagesSheet = getSheet(SHEETS.PACKAGES);
+  const packagesData = packagesSheet.getDataRange().getValues();
+  let resellerPrice = 0;
+  let customerPrice = 0;
+
+  for (let i = 1; i < packagesData.length; i++) {
+    if (packagesData[i][2] === packageDays && packagesData[i][5]) {
+      resellerPrice = packagesData[i][3];
+      customerPrice = packagesData[i][4];
+      break;
+    }
+  }
+
+  // Calculate new expiry
+  const now = new Date();
+  const baseDate = orderInfo.currentExpiry > now ? orderInfo.currentExpiry : now;
+  const newExpiry = new Date(baseDate.getTime() + packageDays * 24 * 60 * 60 * 1000);
+
+  // Update order expiry
+  ordersSheet.getRange(orderRow, 9).setValue(newExpiry.toISOString());
+  ordersSheet.getRange(orderRow, 12).setValue('active');
+
+  // Handle based on role
+  if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'owner') {
+    // Admin renewal - 50% commission
+    const adminsSheet = getSheet(SHEETS.ADMINS);
+    const adminsData = adminsSheet.getDataRange().getValues();
+
+    let adminCommissions = {};
+    for (let i = 1; i < adminsData.length; i++) {
+      if (adminsData[i][0] === userId) {
+        adminCommissions = tryParseJSON(adminsData[i][5], {});
+        break;
+      }
+    }
+
+    const baseCommission = adminCommissions[packageDays] || 0;
+    const renewalCommission = Math.floor(baseCommission * 0.5); // 50%
+
+    if (renewalCommission > 0) {
+      const commissionSheet = getSheet(SHEETS.COMMISSION_LOG);
+      commissionSheet.appendRow([
+        generateId(),
+        userId,
+        orderInfo.adminName,
+        orderId,
+        orderInfo.subEmail,
+        packageDays,
+        renewalCommission,
+        now.toISOString(),
+        'renewal'
+      ]);
+    }
+
+    return {
+      success: true,
+      message: `ต่ออายุสำเร็จ ${packageDays} วัน (ค่าคอม ฿${renewalCommission})`,
+      newExpiresAt: newExpiry.toISOString(),
+      commission: renewalCommission
+    };
+
+  } else if (userRole === 'reseller') {
+    // Reseller - add to balance
+    const txnSheet = getSheet(SHEETS.TRANSACTIONS);
+    txnSheet.appendRow([
+      generateId(),
+      userId,
+      orderInfo.adminName,
+      orderId,
+      orderInfo.subEmail,
+      packageDays,
+      resellerPrice,
+      'pending',
+      now.toISOString(),
+      '',
+      '',
+      'renewal'
+    ]);
+
+    return {
+      success: true,
+      message: `ต่ออายุสำเร็จ ${packageDays} วัน (ยอดค้าง +฿${resellerPrice})`,
+      newExpiresAt: newExpiry.toISOString(),
+      amount: resellerPrice
+    };
+
+  } else {
+    // Customer - should have paid already (slipRef provided)
+    return {
+      success: true,
+      message: `ต่ออายุสำเร็จ ${packageDays} วัน`,
+      newExpiresAt: newExpiry.toISOString(),
+      amount: customerPrice
+    };
+  }
+}
+
+// =============== ENHANCED DASHBOARD STATS ===============
+
+function getDashboardStatsEnhanced(data) {
+  const { userId, role, startDate, endDate } = data;
+
+  const ordersSheet = getSheet(SHEETS.ORDERS);
+  const ordersData = ordersSheet.getDataRange().getValues();
+
+  const adminsSheet = getSheet(SHEETS.ADMINS);
+  const adminsData = adminsSheet.getDataRange().getValues();
+
+  const subSheet = getSheet(SHEETS.SUB_EMAILS);
+  const subData = subSheet.getDataRange().getValues();
+
+  const txnSheet = getSheet(SHEETS.TRANSACTIONS);
+  const txnData = txnSheet.getDataRange().getValues();
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Parse date filters
+  const filterStart = startDate ? new Date(startDate) : null;
+  const filterEnd = endDate ? new Date(endDate) : null;
+
+  // Build admin role map
+  const adminRoles = {};
+  for (let i = 1; i < adminsData.length; i++) {
+    adminRoles[adminsData[i][0]] = adminsData[i][3]; // userId -> role
+  }
+
+  // Count stats
+  let totalSales = 0;
+  let todaySales = 0;
+  let monthSales = 0;
+  let adminSales = 0;
+  let resellerSales = 0;
+  let customerSales = 0;
+  let filteredSales = 0;
+  let expiringCount = 0;
+  let stockCount = 0;
+
+  // Revenue stats
+  let adminRevenue = 0;
+  let resellerRevenue = 0;
+  let customerRevenue = 0;
+
+  // Get packages for price lookup
+  const packagesSheet = getSheet(SHEETS.PACKAGES);
+  const packagesData = packagesSheet.getDataRange().getValues();
+  const packagePrices = {};
+  for (let i = 1; i < packagesData.length; i++) {
+    packagePrices[packagesData[i][2]] = {
+      reseller: packagesData[i][3],
+      customer: packagesData[i][4]
+    };
+  }
+
+  for (let i = 1; i < ordersData.length; i++) {
+    const soldAt = new Date(ordersData[i][7]);
+    const expiresAt = new Date(ordersData[i][8]);
+    const adminId = ordersData[i][3];
+    const saleType = ordersData[i][9];
+    const status = ordersData[i][11];
+    const packageDays = ordersData[i][6];
+
+    totalSales++;
+
+    if (soldAt >= today) todaySales++;
+    if (soldAt >= thisMonth) monthSales++;
+
+    // Filter by date range
+    if (filterStart && filterEnd) {
+      if (soldAt >= filterStart && soldAt <= filterEnd) {
+        filteredSales++;
+      }
+    }
+
+    // Count by seller type
+    const sellerRole = adminRoles[adminId] || 'unknown';
+    const prices = packagePrices[packageDays] || { reseller: 0, customer: 0 };
+
+    if (sellerRole === 'customer') {
+      customerSales++;
+      customerRevenue += prices.customer;
+    } else if (sellerRole === 'reseller') {
+      resellerSales++;
+      resellerRevenue += prices.reseller;
+    } else if (saleType === 'direct') {
+      adminSales++;
+      // Admin sales don't have direct revenue (commission-based)
+    }
+
+    // Expiring count
+    if (status === 'active') {
+      const daysUntil = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+      if (daysUntil <= 7 && daysUntil > 0) expiringCount++;
+    }
+  }
+
+  // Stock count
+  for (let i = 1; i < subData.length; i++) {
+    if (subData[i][4] === 'stock') stockCount++;
+  }
+
+  // Unpaid amounts
+  let resellerUnpaid = 0;
+  let resellerUnpaidCount = 0;
+  const unpaidByUser = {};
+
+  for (let i = 1; i < txnData.length; i++) {
+    if (txnData[i][7] !== 'paid') {
+      const amount = Number(txnData[i][6]) || 0;
+      resellerUnpaid += amount;
+      resellerUnpaidCount++;
+
+      const uid = txnData[i][1];
+      if (!unpaidByUser[uid]) unpaidByUser[uid] = 0;
+      unpaidByUser[uid] += amount;
+    }
+  }
+
+  // User counts
+  let adminCount = 0;
+  let resellerCount = 0;
+  let customerCount = 0;
+  let newUsersThisMonth = 0;
+
+  for (let i = 1; i < adminsData.length; i++) {
+    const r = adminsData[i][3];
+    const createdAt = new Date(adminsData[i][7]);
+
+    if (r === 'admin' || r === 'super_admin') adminCount++;
+    else if (r === 'reseller') resellerCount++;
+    else if (r === 'customer') customerCount++;
+
+    if (createdAt >= thisMonth) newUsersThisMonth++;
+  }
+
+  return {
+    success: true,
+    stats: {
+      // Overview
+      totalSales,
+      todaySales,
+      monthSales,
+      filteredSales,
+      stockCount,
+      expiringCount,
+
+      // By seller type
+      adminSales,
+      resellerSales,
+      customerSales,
+
+      // Revenue
+      resellerRevenue,
+      customerRevenue,
+      totalRevenue: resellerRevenue + customerRevenue,
+
+      // Unpaid
+      resellerUnpaid,
+      resellerUnpaidCount,
+      unpaidUserCount: Object.keys(unpaidByUser).length,
+
+      // Users
+      adminCount,
+      resellerCount,
+      customerCount,
+      totalUsers: adminCount + resellerCount + customerCount,
+      newUsersThisMonth
+    }
+  };
 }

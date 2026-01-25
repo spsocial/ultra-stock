@@ -12,6 +12,7 @@ app.use(express.static('public'));
 // Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'ultra-stock-secret-key-change-in-production';
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'YOUR_GOOGLE_SCRIPT_URL_HERE';
+const EASYSLIP_API_KEY = process.env.EASYSLIP_API_KEY || 'bf4c6851-0df7-4020-8488-cfe5a7f4f276';
 const PORT = process.env.PORT || 3000;
 
 // Helper: Call Google Apps Script
@@ -26,6 +27,31 @@ async function callGoogleScript(action, data = {}) {
   } catch (error) {
     console.error('Google Script Error:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// Helper: Verify Slip with EasySlip API
+async function verifySlipWithEasySlip(base64Image) {
+  try {
+    const response = await fetch('https://developer.easyslip.com/api/v1/verify', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${EASYSLIP_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ image: base64Image })
+    });
+
+    const data = await response.json();
+
+    if (data.status === 200 && data.data) {
+      return { success: true, data: data.data };
+    }
+
+    return { success: false, error: data.message || 'ไม่สามารถตรวจสอบสลิปได้' };
+  } catch (error) {
+    console.error('EasySlip API error:', error);
+    return { success: false, error: error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ EasySlip' };
   }
 }
 
@@ -93,6 +119,39 @@ app.post('/api/login', async (req, res) => {
     });
   } else {
     res.status(401).json(result);
+  }
+});
+
+// Register (สมัครสมาชิก - ได้ role customer อัตโนมัติ)
+app.post('/api/register', async (req, res) => {
+  const { username, password, name, phone, lineId } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอก Username และ Password' });
+  }
+
+  const result = await callGoogleScript('register', { username, password, name, phone, lineId });
+
+  if (result.success) {
+    // Auto login after register
+    const token = jwt.sign(
+      {
+        id: result.user.id,
+        username: result.user.username,
+        role: result.user.role
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      message: result.message,
+      token,
+      user: result.user
+    });
+  } else {
+    res.status(400).json(result);
   }
 });
 
@@ -479,6 +538,264 @@ app.post('/api/send-stock-report', authenticateToken, requireRole('owner', 'supe
   } catch (error) {
     res.json({ success: false, error: error.message });
   }
+});
+
+// ============ BANK ACCOUNT ROUTES ============
+
+// Get Bank Account (Public - ใช้ตอนแสดงข้อมูลโอนเงิน)
+app.get('/api/bank-account', async (req, res) => {
+  const result = await callGoogleScript('getBankAccount');
+  res.json(result);
+});
+
+// Update Bank Account (Owner only)
+app.put('/api/bank-account', authenticateToken, requireRole('owner'), async (req, res) => {
+  const { bankName, accountNumber, accountName } = req.body;
+  const result = await callGoogleScript('updateBankAccount', { bankName, accountNumber, accountName });
+  res.json(result);
+});
+
+// ============ PAYMENT ROUTES ============
+
+// Reseller: Get Unpaid Amount
+app.get('/api/reseller/unpaid', authenticateToken, async (req, res) => {
+  const result = await callGoogleScript('getResellerUnpaidAmount', { userId: req.user.id });
+  res.json(result);
+});
+
+// Reseller: Submit Payment (แนบสลิป)
+app.post('/api/reseller/submit-payment', authenticateToken, async (req, res) => {
+  const { slipImage } = req.body;
+
+  if (!slipImage) {
+    return res.status(400).json({ success: false, error: 'กรุณาแนบสลิปโอนเงิน' });
+  }
+
+  // 1. Get unpaid amount
+  const unpaidResult = await callGoogleScript('getResellerUnpaidAmount', { userId: req.user.id });
+  if (!unpaidResult.success || unpaidResult.unpaidAmount === 0) {
+    return res.status(400).json({ success: false, error: 'ไม่มียอดค้างชำระ' });
+  }
+
+  const unpaidAmount = unpaidResult.unpaidAmount;
+
+  // 2. Verify slip with EasySlip
+  const easySlipResult = await verifySlipWithEasySlip(slipImage);
+  if (!easySlipResult.success) {
+    return res.status(400).json({ success: false, error: easySlipResult.error || 'ไม่สามารถอ่านสลิปได้' });
+  }
+
+  const slipData = easySlipResult.data;
+  const slipRef = slipData.transRef || '';
+  const slipAmount = slipData.amount?.amount || 0;
+
+  // 3. Check duplicate slip
+  if (slipRef) {
+    const dupCheck = await callGoogleScript('checkDuplicateSlip', { slipRef });
+    if (dupCheck.isDuplicate) {
+      return res.status(400).json({ success: false, error: 'สลิปนี้เคยใช้แล้ว! กรุณาใช้สลิปใหม่' });
+    }
+  }
+
+  // 4. Check receiver account
+  const bankResult = await callGoogleScript('getBankAccount');
+  const ourAccount = bankResult.bankAccount?.accountNumber?.replace(/-/g, '') || '';
+  if (ourAccount && slipData.receiver?.account?.value) {
+    const receiverAccount = slipData.receiver.account.value.replace(/-/g, '');
+    if (!receiverAccount.includes(ourAccount) && !ourAccount.includes(receiverAccount)) {
+      return res.status(400).json({ success: false, error: 'บัญชีปลายทางไม่ตรง!' });
+    }
+  }
+
+  // 5. Check slip date (< 24 hours)
+  if (slipData.transTimestamp) {
+    const slipDate = new Date(slipData.transTimestamp);
+    const hoursDiff = (Date.now() - slipDate) / (1000 * 60 * 60);
+    if (hoursDiff > 24) {
+      return res.status(400).json({ success: false, error: 'สลิปนี้เก่าเกิน 24 ชั่วโมง!' });
+    }
+  }
+
+  // 6. Check amount
+  if (slipAmount !== unpaidAmount) {
+    return res.status(400).json({
+      success: false,
+      error: `ยอดไม่ตรง! ค้างชำระ ฿${unpaidAmount.toLocaleString()} แต่สลิป ฿${slipAmount.toLocaleString()}`
+    });
+  }
+
+  // 7. Mark transactions as paid
+  const transactionIds = unpaidResult.unpaidTransactions.map(t => t.id);
+  await callGoogleScript('markResellerTransactionsPaid', {
+    transactionIds,
+    slipRef,
+    paidAt: new Date().toISOString()
+  });
+
+  // 8. Save payment log
+  await callGoogleScript('savePaymentLog', {
+    userId: req.user.id,
+    userName: req.user.username,
+    userRole: req.user.role,
+    amount: slipAmount,
+    slipRef,
+    status: 'approved',
+    transactionIds
+  });
+
+  res.json({
+    success: true,
+    message: `ชำระเงินสำเร็จ! ยอด ฿${slipAmount.toLocaleString()}`,
+    paidAmount: slipAmount
+  });
+});
+
+// Customer: Create Pending Order
+app.post('/api/customer/pending-order', authenticateToken, async (req, res) => {
+  const { subEmailIds, packageDays, amount } = req.body;
+
+  const result = await callGoogleScript('createPendingOrder', {
+    userId: req.user.id,
+    userName: req.user.username,
+    subEmailIds,
+    packageDays,
+    amount
+  });
+
+  res.json(result);
+});
+
+// Customer: Get Pending Orders
+app.get('/api/customer/pending-orders', authenticateToken, async (req, res) => {
+  const result = await callGoogleScript('getPendingOrders', { userId: req.user.id });
+  res.json(result);
+});
+
+// Customer: Pay Pending Order (แนบสลิป)
+app.post('/api/customer/pay-order', authenticateToken, async (req, res) => {
+  const { orderId, slipImage } = req.body;
+
+  if (!slipImage) {
+    return res.status(400).json({ success: false, error: 'กรุณาแนบสลิปโอนเงิน' });
+  }
+
+  // Get pending order to verify amount
+  const pendingResult = await callGoogleScript('getPendingOrders', { userId: req.user.id });
+  const order = pendingResult.orders?.find(o => o.id === orderId);
+
+  if (!order) {
+    return res.status(400).json({ success: false, error: 'ไม่พบคำสั่งซื้อหรือหมดอายุแล้ว' });
+  }
+
+  // Verify slip
+  const easySlipResult = await verifySlipWithEasySlip(slipImage);
+  if (!easySlipResult.success) {
+    return res.status(400).json({ success: false, error: easySlipResult.error });
+  }
+
+  const slipData = easySlipResult.data;
+  const slipRef = slipData.transRef || '';
+  const slipAmount = slipData.amount?.amount || 0;
+
+  // Check duplicate
+  if (slipRef) {
+    const dupCheck = await callGoogleScript('checkDuplicateSlip', { slipRef });
+    if (dupCheck.isDuplicate) {
+      return res.status(400).json({ success: false, error: 'สลิปนี้เคยใช้แล้ว!' });
+    }
+  }
+
+  // Check receiver account
+  const bankResult = await callGoogleScript('getBankAccount');
+  const ourAccount = bankResult.bankAccount?.accountNumber?.replace(/-/g, '') || '';
+  if (ourAccount && slipData.receiver?.account?.value) {
+    const receiverAccount = slipData.receiver.account.value.replace(/-/g, '');
+    if (!receiverAccount.includes(ourAccount) && !ourAccount.includes(receiverAccount)) {
+      return res.status(400).json({ success: false, error: 'บัญชีปลายทางไม่ตรง!' });
+    }
+  }
+
+  // Check amount
+  if (slipAmount !== order.amount) {
+    return res.status(400).json({
+      success: false,
+      error: `ยอดไม่ตรง! ต้องโอน ฿${order.amount.toLocaleString()} แต่สลิป ฿${slipAmount.toLocaleString()}`
+    });
+  }
+
+  // Complete order
+  const result = await callGoogleScript('completePendingOrder', { orderId, slipRef });
+
+  if (result.success) {
+    // Save payment log
+    await callGoogleScript('savePaymentLog', {
+      userId: req.user.id,
+      userName: req.user.username,
+      userRole: 'customer',
+      amount: slipAmount,
+      slipRef,
+      status: 'approved',
+      transactionIds: [orderId]
+    });
+  }
+
+  res.json(result);
+});
+
+// Cancel Pending Order
+app.delete('/api/customer/pending-order/:id', authenticateToken, async (req, res) => {
+  const result = await callGoogleScript('cancelPendingOrder', { orderId: req.params.id });
+  res.json(result);
+});
+
+// ============ RENEWAL ROUTES ============
+
+// Renew Order
+app.post('/api/orders/:id/renew', authenticateToken, async (req, res) => {
+  const { packageDays, slipRef } = req.body;
+
+  const result = await callGoogleScript('renewOrder', {
+    orderId: req.params.id,
+    packageDays,
+    userId: req.user.id,
+    userRole: req.user.role,
+    slipRef
+  });
+
+  res.json(result);
+});
+
+// ============ ENHANCED DASHBOARD ROUTES ============
+
+// Get Enhanced Stats (with date filter)
+app.get('/api/dashboard-enhanced', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const result = await callGoogleScript('getDashboardStatsEnhanced', {
+    userId: req.user.id,
+    role: req.user.role,
+    startDate,
+    endDate
+  });
+
+  res.json(result);
+});
+
+// ============ ADMIN: RESET PASSWORD ============
+
+app.post('/api/users/:id/reset-password', authenticateToken, requireRole('owner', 'super_admin', 'admin'), async (req, res) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอกรหัสผ่านใหม่' });
+  }
+
+  const result = await callGoogleScript('resetUserPassword', {
+    userId: req.params.id,
+    newPassword
+  });
+
+  res.json(result);
 });
 
 // ============ STATIC PAGES ============
