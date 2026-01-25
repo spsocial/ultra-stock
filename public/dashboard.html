@@ -94,6 +94,9 @@
           <a href="#" class="nav-link" data-page="commissions">
             <span class="icon">💵</span> ตั้งค่าคอม
           </a>
+          <a href="#" class="nav-link" data-page="all-commission">
+            <span class="icon">💰</span> จ่ายค่าคอม
+          </a>
           <a href="#" class="nav-link" data-page="all-transactions">
             <span class="icon">📑</span> รายการตัวแทน
           </a>
@@ -239,14 +242,35 @@
               <input type="text" class="form-control" id="customerName" placeholder="ระบุชื่อลูกค้า">
             </div>
 
-            <!-- Buy Buttons -->
-            <div style="display:flex; gap:10px; margin-top:20px;">
-              <button class="btn btn-primary" style="flex:1;" onclick="buyDirect()">
-                🛒 ซื้อ (นับคอม)
-              </button>
-              <button class="btn btn-secondary" id="btnBuyStock" style="flex:1;" onclick="buyStock()">
-                📦 ลงสต็อก
-              </button>
+            <!-- Buy Buttons - Different for each role -->
+            <div id="buyButtonsContainer" style="display:flex; gap:10px; margin-top:20px;">
+              <!-- For Admin/Super Admin/Owner -->
+              <div id="buyBtnAdmin" style="display:none; flex:1; display:flex; gap:10px; width:100%;">
+                <button class="btn btn-primary" style="flex:1;" onclick="buyDirect()">
+                  🛒 ซื้อ (นับคอม)
+                </button>
+                <button class="btn btn-secondary" id="btnBuyStock" style="flex:1;" onclick="buyStock()">
+                  📦 ลงสต็อก
+                </button>
+              </div>
+              <!-- For Reseller -->
+              <div id="buyBtnReseller" style="display:none; flex:1;">
+                <button class="btn btn-primary btn-block" onclick="buyDirect()">
+                  🛒 ซื้อ (หักยอด)
+                </button>
+              </div>
+              <!-- For Customer -->
+              <div id="buyBtnCustomer" style="display:none; flex:1;">
+                <button class="btn btn-success btn-block" onclick="customerBuy()">
+                  💳 สั่งซื้อ (ชำระเงิน)
+                </button>
+              </div>
+            </div>
+
+            <!-- Price Summary -->
+            <div id="priceSummary" style="margin-top:15px; padding:15px; background:var(--dark); border-radius:8px; text-align:center;">
+              <span class="text-muted">ราคารวม:</span>
+              <span id="totalPrice" style="font-size:1.5rem; font-weight:bold; color:var(--success); margin-left:10px;">฿0</span>
             </div>
           </div>
         </div>
@@ -387,14 +411,57 @@
             </select>
           </div>
           <div class="card-body">
-            <div class="stat-card">
-              <div class="stat-value text-success" id="totalCommission">฿0</div>
-              <div class="stat-label">รวมค่าคอมมิชชั่น</div>
+            <!-- Enhanced stats grid -->
+            <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));">
+              <div class="stat-card success">
+                <div class="stat-value" id="totalEarned">฿0</div>
+                <div class="stat-label">รวมค่าคอม</div>
+              </div>
+              <div class="stat-card primary">
+                <div class="stat-value" id="totalPaid">฿0</div>
+                <div class="stat-label">ได้รับแล้ว</div>
+              </div>
+              <div class="stat-card warning">
+                <div class="stat-value" id="totalUnpaid">฿0</div>
+                <div class="stat-label">ค้างจ่าย</div>
+              </div>
+              <div class="stat-card" style="background:linear-gradient(135deg, #9333ea, #7e22ce);">
+                <div class="stat-value" id="totalBonus">฿0</div>
+                <div class="stat-label">โบนัส</div>
+              </div>
+            </div>
+
+            <!-- Commission breakdown -->
+            <div style="margin-top:20px;display:flex;gap:20px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;padding:15px;background:var(--dark);border-radius:8px;">
+                <div style="color:var(--text-muted);font-size:0.9rem;">คอมจากขาย</div>
+                <div style="font-size:1.3rem;font-weight:bold;color:var(--success);" id="salesCommission">฿0</div>
+              </div>
+              <div style="flex:1;min-width:200px;padding:15px;background:var(--dark);border-radius:8px;">
+                <div style="color:var(--text-muted);font-size:0.9rem;">คอมจากต่ออายุ (50%)</div>
+                <div style="font-size:1.3rem;font-weight:bold;color:var(--warning);" id="renewalCommission">฿0</div>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- Payment History -->
+        <div class="card mb-20">
+          <div class="card-header">
+            <h3>ประวัติรับเงิน</h3>
+          </div>
+          <div class="card-body">
+            <div id="paymentHistoryList">
+              <div class="empty-state"><div class="icon">💸</div><h4>ยังไม่มีประวัติรับเงิน</h4></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commission Log Table -->
         <div class="card">
+          <div class="card-header">
+            <h3>รายละเอียดค่าคอม</h3>
+          </div>
           <div class="card-body">
             <div class="table-container">
               <table>
@@ -402,14 +469,59 @@
                   <tr>
                     <th>ซับเมล</th>
                     <th>แพ็ก</th>
+                    <th>ประเภท</th>
                     <th>ค่าคอม</th>
                     <th>วันที่</th>
                   </tr>
                 </thead>
                 <tbody id="commissionTable">
-                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- All Admins Commission Page (Owner only) -->
+      <div class="page hidden" id="page-all-commission">
+        <div class="page-header">
+          <h2>💵 ค่าคอมทั้งหมด</h2>
+          <p>ดูและจ่ายค่าคอมให้ Admin/Super Admin ทุกคน</p>
+        </div>
+
+        <div class="card mb-20">
+          <div class="card-header">
+            <h3>สรุปรวม</h3>
+            <select class="form-control" style="width:auto;" id="allCommissionMonth" onchange="loadAllCommission()">
+              <!-- Dynamic months -->
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="stats-grid">
+              <div class="stat-card success">
+                <div class="stat-value" id="allTotalEarned">฿0</div>
+                <div class="stat-label">รวมค่าคอม</div>
+              </div>
+              <div class="stat-card primary">
+                <div class="stat-value" id="allTotalPaid">฿0</div>
+                <div class="stat-label">จ่ายแล้ว</div>
+              </div>
+              <div class="stat-card danger">
+                <div class="stat-value" id="allTotalUnpaid">฿0</div>
+                <div class="stat-label">ค้างจ่าย</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>รายชื่อ Admin</h3>
+          </div>
+          <div class="card-body">
+            <div id="allAdminsCommissionList">
+              <div class="loading"><div class="spinner"></div></div>
             </div>
           </div>
         </div>
@@ -765,11 +877,19 @@
       document.getElementById('navAdminSection').style.display = 'block';
     }
 
-    // Check permission for buy without commission
-    const canBuyStock = user.role === 'owner' || user.role === 'super_admin' ||
-      (user.permissions && user.permissions.canBuyWithoutCommission);
-    if (!canBuyStock) {
-      document.getElementById('btnBuyStock').style.display = 'none';
+    // Show correct buy buttons based on role
+    if (user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin') {
+      document.getElementById('buyBtnAdmin').style.display = 'flex';
+      // Check permission for buy without commission
+      const canBuyStock = user.role === 'owner' || user.role === 'super_admin' ||
+        (user.permissions && user.permissions.canBuyWithoutCommission);
+      if (!canBuyStock) {
+        document.getElementById('btnBuyStock').style.display = 'none';
+      }
+    } else if (user.role === 'reseller') {
+      document.getElementById('buyBtnReseller').style.display = 'block';
+    } else if (user.role === 'customer') {
+      document.getElementById('buyBtnCustomer').style.display = 'block';
     }
 
     // =============== NAVIGATION ===============
@@ -804,6 +924,7 @@
         case 'admins': loadAdmins(); break;
         case 'packages': loadPackages(); break;
         case 'commissions': loadCommissions(); break;
+        case 'all-commission': loadAllCommission(); break;
         case 'all-transactions': loadAllTransactions(); break;
         case 'bank-settings': loadBankSettings(); break;
         case 'settings': loadSettings(); break;
@@ -1027,21 +1148,48 @@
       }
     }
 
+    function getPackagePrice(pkg) {
+      // Return the correct price based on user role
+      if (user.role === 'customer') {
+        return pkg.customerPrice || pkg.price || 0;
+      } else {
+        return pkg.resellerPrice || pkg.price || 0;
+      }
+    }
+
     function renderPackageOptions() {
       const container = document.getElementById('packageOptions');
-      container.innerHTML = packages.map(pkg => `
-        <div class="package-option ${selectedPackage === pkg.days ? 'selected' : ''}"
-             onclick="selectPackage(${pkg.days})">
-          <div class="package-days">${pkg.days}</div>
-          <div class="package-name">${pkg.name}</div>
-        </div>
-      `).join('');
+      container.innerHTML = packages.map(pkg => {
+        const price = getPackagePrice(pkg);
+        return `
+          <div class="package-option ${selectedPackage === pkg.days ? 'selected' : ''}"
+               onclick="selectPackage(${pkg.days})">
+            <div class="package-days">${pkg.days}</div>
+            <div class="package-name">${pkg.name}</div>
+            <div class="package-price" style="font-size:0.85rem;color:var(--success);">฿${price.toLocaleString()}</div>
+          </div>
+        `;
+      }).join('');
+      updatePriceSummary();
     }
 
     function selectPackage(days) {
       selectedPackage = days;
       renderPackageOptions();
     }
+
+    function updatePriceSummary() {
+      const quantity = parseInt(document.getElementById('buyQuantity').value) || 1;
+      const pkg = packages.find(p => p.days === selectedPackage);
+      if (pkg) {
+        const price = getPackagePrice(pkg);
+        const total = price * quantity;
+        document.getElementById('totalPrice').textContent = '฿' + total.toLocaleString();
+      }
+    }
+
+    // Update price when quantity changes
+    document.getElementById('buyQuantity').addEventListener('input', updatePriceSummary);
 
     async function buyDirect() {
       await doBuy('direct');
@@ -1134,6 +1282,136 @@
 
       navigator.clipboard.writeText(text);
       showToast('Copied! พร้อมส่งให้ลูกค้า', 'success');
+    }
+
+    // =============== CUSTOMER BUY FLOW ===============
+    async function customerBuy() {
+      const quantity = parseInt(document.getElementById('buyQuantity').value) || 1;
+
+      if (quantity < 1) {
+        showToast('กรุณาระบุจำนวน', 'warning');
+        return;
+      }
+      if (quantity > availableStock.length) {
+        showToast(`สต็อกไม่พอ (มี ${availableStock.length} รายการ)`, 'warning');
+        return;
+      }
+      if (!selectedPackage) {
+        showToast('กรุณาเลือกแพ็กเกจ', 'warning');
+        return;
+      }
+
+      // Get first N stock items
+      const subEmailIds = availableStock.slice(0, quantity).map(e => e.id);
+      const customerName = document.getElementById('customerName').value;
+      const pkg = packages.find(p => p.days === selectedPackage);
+      const price = getPackagePrice(pkg);
+      const totalAmount = price * quantity;
+
+      // Create pending order
+      const data = await apiPost('/api/customer/pending-order', {
+        subEmailIds,
+        packageDays: selectedPackage,
+        customerName,
+        totalAmount
+      }, 'กำลังสร้างรายการ...');
+
+      if (data.success) {
+        // Show payment modal with bank info
+        showCustomerPaymentModal(data.pendingOrder.id, totalAmount, quantity, pkg);
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function showCustomerPaymentModal(orderId, amount, quantity, pkg) {
+      // Load bank account info
+      const bankData = await apiGet('/api/bank-account', false);
+      const bank = bankData.bankAccount || {};
+
+      showModal('💳 ชำระเงิน', `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:2.5rem;font-weight:bold;color:var(--warning);">฿${amount.toLocaleString()}</div>
+          <p class="text-muted">ยอดที่ต้องชำระ</p>
+          <p style="font-size:0.9rem;color:var(--text-muted);">${quantity} รายการ x แพ็กเกจ ${pkg.name}</p>
+        </div>
+
+        <div style="background:var(--dark);padding:20px;border-radius:12px;margin-bottom:20px;">
+          <h4 style="margin-bottom:15px;color:var(--primary);">📌 บัญชีปลายทาง</h4>
+          <p><strong>ธนาคาร:</strong> ${bank.bankName || '-'}</p>
+          <p><strong>เลขบัญชี:</strong> <code style="font-size:1.1rem;color:var(--success);">${bank.accountNumber || '-'}</code>
+            <button class="btn btn-sm" style="margin-left:10px;padding:5px 10px;" onclick="copyToClipboard('${bank.accountNumber || ''}')">📋</button>
+          </p>
+          <p><strong>ชื่อบัญชี:</strong> ${bank.accountName || '-'}</p>
+        </div>
+
+        <div style="background:rgba(255,193,7,0.1);padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid var(--warning);">
+          <p style="color:var(--warning);font-size:0.9rem;margin:0;">
+            ⏰ กรุณาชำระเงินภายใน 30 นาที มิฉะนั้นรายการจะถูกยกเลิกอัตโนมัติ
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label>📷 แนบรูปสลิป</label>
+          <input type="file" class="form-control" id="customerBuySlipInput" accept="image/*" onchange="previewCustomerBuySlip(this)">
+          <div id="customerBuySlipPreview" style="margin-top:10px;display:none;">
+            <img id="customerBuySlipPreviewImg" style="max-width:100%;border-radius:8px;">
+          </div>
+        </div>
+
+        <button class="btn btn-success btn-block" onclick="submitCustomerBuyPayment('${orderId}')">✅ ยืนยันการชำระเงิน</button>
+        <button class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="hideModal()">ยกเลิก</button>
+      `);
+    }
+
+    function previewCustomerBuySlip(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('customerBuySlipPreviewImg').src = e.target.result;
+          document.getElementById('customerBuySlipPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function submitCustomerBuyPayment(orderId) {
+      const fileInput = document.getElementById('customerBuySlipInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('กรุณาแนบรูปสลิป', 'warning');
+        return;
+      }
+
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        const data = await apiPost('/api/customer/pay-order', {
+          orderId,
+          slipImage: base64
+        }, 'กำลังตรวจสอบสลิป...');
+
+        if (data.success) {
+          hideModal();
+          showToast(data.message || 'ชำระเงินสำเร็จ!', 'success');
+
+          // Show purchased emails
+          if (data.orders && data.orders.length > 0) {
+            showPurchaseResult(data.orders);
+          }
+
+          // Reload buy page
+          loadBuyPage();
+        } else {
+          showToast(data.error, 'error');
+        }
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => showToast('คัดลอกแล้ว!', 'success'));
     }
 
     // =============== SEARCH ===============
@@ -1233,12 +1511,31 @@
                 <button class="btn btn-sm btn-primary" onclick="copyOrderEmails(${idx})">📋 คัดลอกทั้งหมด</button>
               </div>
               <div class="order-emails" id="order-emails-${idx}">
-                ${order.items.map((item, i) => `
-                  <div style="padding:10px;margin-bottom:8px;background:var(--card-bg);border-radius:6px;border-left:3px solid ${item.status === 'expired' ? 'var(--danger)' : 'var(--success)'};">
-                    <div><strong>${i + 1}.</strong> <code>${item.email}</code></div>
-                    <div style="margin-top:5px;color:var(--text-muted);font-size:0.9rem;">Password: <code>${item.password}</code></div>
+                ${order.items.map((item, i) => {
+                  const expiryDate = new Date(item.expiresAt);
+                  const now = new Date();
+                  const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                  const isExpiringSoon = daysLeft > 0 && daysLeft <= 3;
+                  const isExpired = item.status === 'expired' || daysLeft <= 0;
+
+                  return `
+                  <div style="padding:10px;margin-bottom:8px;background:var(--card-bg);border-radius:6px;border-left:3px solid ${isExpired ? 'var(--danger)' : isExpiringSoon ? 'var(--warning)' : 'var(--success)'};">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                      <div>
+                        <div><strong>${i + 1}.</strong> <code>${item.email}</code></div>
+                        <div style="margin-top:5px;color:var(--text-muted);font-size:0.9rem;">Password: <code>${item.password}</code></div>
+                        <div style="margin-top:5px;font-size:0.85rem;">
+                          หมดอายุ: <span style="color:${isExpired ? 'var(--danger)' : isExpiringSoon ? 'var(--warning)' : 'var(--text-muted)'};">${formatDate(item.expiresAt)}</span>
+                          ${isExpiringSoon ? `<span class="badge badge-warning" style="margin-left:5px;">เหลือ ${daysLeft} วัน</span>` : ''}
+                          ${isExpired ? `<span class="badge badge-danger" style="margin-left:5px;">หมดอายุแล้ว</span>` : ''}
+                        </div>
+                      </div>
+                      ${isExpiringSoon || isExpired ? `
+                        <button class="btn btn-sm btn-warning" onclick="showRenewModal('${item.email}', ${order.packageDays})">🔄 ต่ออายุ</button>
+                      ` : ''}
+                    </div>
                   </div>
-                `).join('')}
+                `}).join('')}
               </div>
             </div>
           </div>
@@ -1556,6 +1853,162 @@ sub2@example.com:password2"></textarea>
       }
     }
 
+    // =============== RENEWAL SYSTEM ===============
+    function showRenewModal(email, currentPackageDays) {
+      // Build package options with prices based on role
+      const pkgOptions = packages.map(pkg => {
+        const price = getPackagePrice(pkg);
+        return `<option value="${pkg.days}" ${pkg.days === currentPackageDays ? 'selected' : ''}>${pkg.name} - ฿${price.toLocaleString()}</option>`;
+      }).join('');
+
+      const isCustomer = user.role === 'customer';
+      const buttonText = isCustomer ? '💳 ชำระเงินต่ออายุ' : '🔄 ต่ออายุ';
+      const buttonClass = isCustomer ? 'btn-success' : 'btn-warning';
+
+      showModal('🔄 ต่ออายุเมล', `
+        <div style="text-align:center;margin-bottom:20px;">
+          <code style="font-size:1.1rem;">${email}</code>
+        </div>
+
+        <div class="form-group">
+          <label>เลือกแพ็กเกจ</label>
+          <select class="form-control" id="renewPackageSelect" onchange="updateRenewPrice()">
+            ${pkgOptions}
+          </select>
+        </div>
+
+        <div id="renewPriceDisplay" style="text-align:center;padding:15px;background:var(--dark);border-radius:8px;margin-bottom:20px;">
+          <span class="text-muted">ราคา:</span>
+          <span id="renewPriceValue" style="font-size:1.5rem;font-weight:bold;color:var(--success);margin-left:10px;">฿0</span>
+        </div>
+
+        ${isCustomer ? `
+          <div style="background:rgba(255,193,7,0.1);padding:10px;border-radius:8px;margin-bottom:15px;border:1px solid var(--warning);">
+            <p style="color:var(--warning);font-size:0.85rem;margin:0;">💡 กรุณาชำระเงินก่อนต่ออายุ</p>
+          </div>
+        ` : ''}
+
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn ${buttonClass}" onclick="processRenewal('${email}')">${buttonText}</button>
+        </div>
+      `);
+
+      // Update initial price
+      updateRenewPrice();
+    }
+
+    function updateRenewPrice() {
+      const selectedDays = parseInt(document.getElementById('renewPackageSelect').value);
+      const pkg = packages.find(p => p.days === selectedDays);
+      if (pkg) {
+        const price = getPackagePrice(pkg);
+        document.getElementById('renewPriceValue').textContent = '฿' + price.toLocaleString();
+      }
+    }
+
+    async function processRenewal(email) {
+      const packageDays = parseInt(document.getElementById('renewPackageSelect').value);
+      const pkg = packages.find(p => p.days === packageDays);
+      const price = getPackagePrice(pkg);
+
+      if (user.role === 'customer') {
+        // Customer needs to pay first - show payment modal
+        hideModal();
+        await showRenewalPaymentModal(email, packageDays, price, pkg);
+      } else {
+        // Admin/Reseller can renew directly (will be added to balance for reseller)
+        const data = await apiPost('/api/orders/renew', {
+          email,
+          packageDays
+        }, 'กำลังต่ออายุ...');
+
+        if (data.success) {
+          showToast(data.message || 'ต่ออายุสำเร็จ!', 'success');
+          hideModal();
+          loadHistory();
+          loadExpiring();
+        } else {
+          showToast(data.error, 'error');
+        }
+      }
+    }
+
+    async function showRenewalPaymentModal(email, packageDays, amount, pkg) {
+      // Load bank account info
+      const bankData = await apiGet('/api/bank-account', false);
+      const bank = bankData.bankAccount || {};
+
+      showModal('💳 ชำระเงินต่ออายุ', `
+        <div style="text-align:center;margin-bottom:20px;">
+          <code style="font-size:1rem;">${email}</code>
+          <div style="font-size:2rem;font-weight:bold;color:var(--warning);margin-top:10px;">฿${amount.toLocaleString()}</div>
+          <p class="text-muted">แพ็กเกจ ${pkg.name}</p>
+        </div>
+
+        <div style="background:var(--dark);padding:20px;border-radius:12px;margin-bottom:20px;">
+          <h4 style="margin-bottom:15px;color:var(--primary);">📌 บัญชีปลายทาง</h4>
+          <p><strong>ธนาคาร:</strong> ${bank.bankName || '-'}</p>
+          <p><strong>เลขบัญชี:</strong> <code style="font-size:1.1rem;color:var(--success);">${bank.accountNumber || '-'}</code>
+            <button class="btn btn-sm" style="margin-left:10px;padding:5px 10px;" onclick="copyToClipboard('${bank.accountNumber || ''}')">📋</button>
+          </p>
+          <p><strong>ชื่อบัญชี:</strong> ${bank.accountName || '-'}</p>
+        </div>
+
+        <div class="form-group">
+          <label>📷 แนบรูปสลิป</label>
+          <input type="file" class="form-control" id="renewSlipInput" accept="image/*" onchange="previewRenewSlip(this)">
+          <div id="renewSlipPreview" style="margin-top:10px;display:none;">
+            <img id="renewSlipPreviewImg" style="max-width:100%;border-radius:8px;">
+          </div>
+        </div>
+
+        <button class="btn btn-success btn-block" onclick="submitRenewalPayment('${email}', ${packageDays}, ${amount})">✅ ยืนยันการชำระเงิน</button>
+        <button class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="hideModal()">ยกเลิก</button>
+      `);
+    }
+
+    function previewRenewSlip(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('renewSlipPreviewImg').src = e.target.result;
+          document.getElementById('renewSlipPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function submitRenewalPayment(email, packageDays, amount) {
+      const fileInput = document.getElementById('renewSlipInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('กรุณาแนบรูปสลิป', 'warning');
+        return;
+      }
+
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        const data = await apiPost('/api/orders/renew-with-payment', {
+          email,
+          packageDays,
+          amount,
+          slipImage: base64
+        }, 'กำลังตรวจสอบสลิป...');
+
+        if (data.success) {
+          hideModal();
+          showToast(data.message || 'ต่ออายุสำเร็จ!', 'success');
+          loadHistory();
+        } else {
+          showToast(data.error, 'error');
+        }
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+
     // =============== MY COMMISSION ===============
     function loadMyCommission() {
       // Setup month selector
@@ -1575,24 +2028,155 @@ sub2@example.com:password2"></textarea>
 
     async function loadCommissionData() {
       const month = document.getElementById('commissionMonth').value;
+
+      // Load enhanced commission stats
+      const statsData = await apiGet(`/api/admin-commission/${user.id}?month=${month}`);
+      if (statsData.success) {
+        const s = statsData.stats;
+        document.getElementById('totalEarned').textContent = '฿' + s.totalEarned.toLocaleString();
+        document.getElementById('totalPaid').textContent = '฿' + s.totalPaid.toLocaleString();
+        document.getElementById('totalUnpaid').textContent = '฿' + s.unpaid.toLocaleString();
+        document.getElementById('totalBonus').textContent = '฿' + s.bonus.toLocaleString();
+        document.getElementById('salesCommission').textContent = '฿' + s.salesCommission.toLocaleString();
+        document.getElementById('renewalCommission').textContent = '฿' + s.renewalCommission.toLocaleString();
+
+        // Render payment history
+        const paymentList = document.getElementById('paymentHistoryList');
+        if (s.payments && s.payments.length > 0) {
+          paymentList.innerHTML = s.payments.map(p => `
+            <div style="padding:12px;background:var(--dark);border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <span style="font-size:1.2rem;font-weight:bold;color:var(--success);">฿${p.amount.toLocaleString()}</span>
+                ${p.note ? `<span class="text-muted" style="margin-left:10px;font-size:0.9rem;">${p.note}</span>` : ''}
+              </div>
+              <span class="text-muted" style="font-size:0.85rem;">${formatDate(p.paidAt)}</span>
+            </div>
+          `).join('');
+        } else {
+          paymentList.innerHTML = '<div class="empty-state"><div class="icon">💸</div><h4>ยังไม่มีประวัติรับเงิน</h4></div>';
+        }
+      }
+
+      // Load commission log details
       const data = await apiGet('/api/commission-log?month=' + month);
-
       if (data.success) {
-        document.getElementById('totalCommission').textContent = '฿' + data.total.toLocaleString();
-
         const tbody = document.getElementById('commissionTable');
         if (data.logs.length > 0) {
           tbody.innerHTML = data.logs.map(log => `
             <tr>
               <td><code>${log.subEmail}</code></td>
               <td>${log.packageDays} วัน</td>
+              <td><span class="badge ${log.type === 'renewal' ? 'badge-warning' : 'badge-success'}">${log.type === 'renewal' ? 'ต่ออายุ' : 'ขาย'}</span></td>
               <td class="text-success">฿${log.amount.toLocaleString()}</td>
               <td>${formatDate(log.createdAt)}</td>
             </tr>
           `).join('');
         } else {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีค่าคอม</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีค่าคอม</td></tr>';
         }
+      }
+    }
+
+    // =============== ALL COMMISSION (OWNER) ===============
+    function loadAllCommission() {
+      // Setup month selector
+      const select = document.getElementById('allCommissionMonth');
+      if (select.options.length === 0) {
+        const now = new Date();
+        for (let i = 0; i < 6; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = d.toISOString().substring(0, 7);
+          const label = d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
+          select.innerHTML += `<option value="${value}">${label}</option>`;
+        }
+      }
+
+      loadAllCommissionData();
+    }
+
+    async function loadAllCommissionData() {
+      const month = document.getElementById('allCommissionMonth').value;
+      const data = await apiGet(`/api/all-admins-commission?month=${month}`);
+
+      if (data.success) {
+        // Update totals
+        document.getElementById('allTotalEarned').textContent = '฿' + data.totals.totalEarned.toLocaleString();
+        document.getElementById('allTotalPaid').textContent = '฿' + data.totals.totalPaid.toLocaleString();
+        document.getElementById('allTotalUnpaid').textContent = '฿' + data.totals.totalUnpaid.toLocaleString();
+
+        // Render admins list
+        const container = document.getElementById('allAdminsCommissionList');
+        if (data.admins && data.admins.length > 0) {
+          container.innerHTML = data.admins.map(admin => `
+            <div style="padding:20px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:15px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;">
+                <div>
+                  <h4 style="margin:0;">${admin.adminName}</h4>
+                  <div style="display:flex;gap:20px;margin-top:10px;flex-wrap:wrap;">
+                    <span>ค่าคอม: <strong class="text-success">฿${admin.totalEarned.toLocaleString()}</strong></span>
+                    <span>จ่ายแล้ว: <strong class="text-primary">฿${admin.totalPaid.toLocaleString()}</strong></span>
+                    <span>ค้างจ่าย: <strong class="text-danger">฿${admin.unpaid.toLocaleString()}</strong></span>
+                    ${admin.bonus > 0 ? `<span>โบนัส: <strong style="color:#9333ea;">฿${admin.bonus.toLocaleString()}</strong></span>` : ''}
+                  </div>
+                </div>
+                <button class="btn btn-success" onclick="showPayCommissionModal('${admin.adminId}', '${admin.adminName}', ${admin.unpaid})">
+                  💰 จ่ายค่าคอม
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.innerHTML = '<div class="empty-state"><div class="icon">👥</div><h3>ยังไม่มี Admin/Super Admin</h3></div>';
+        }
+      }
+    }
+
+    function showPayCommissionModal(adminId, adminName, unpaidAmount) {
+      showModal('💰 จ่ายค่าคอม', `
+        <div style="text-align:center;margin-bottom:20px;">
+          <h3 style="margin:0;">${adminName}</h3>
+          <p class="text-muted">ค้างจ่าย: <strong class="text-danger">฿${unpaidAmount.toLocaleString()}</strong></p>
+        </div>
+
+        <div class="form-group">
+          <label>จำนวนเงินที่จ่าย</label>
+          <input type="number" class="form-control" id="payCommissionAmount" value="${unpaidAmount}" min="0" style="font-size:1.3rem;text-align:center;">
+          <small class="text-muted">กรอกเกินได้ (จะนับเป็นโบนัส)</small>
+        </div>
+
+        <div class="form-group">
+          <label>หมายเหตุ (ไม่บังคับ)</label>
+          <input type="text" class="form-control" id="payCommissionNote" placeholder="เช่น โบนัส KPI, ทิป">
+        </div>
+
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-success" onclick="payCommission('${adminId}')">✅ ยืนยันจ่ายเงิน</button>
+        </div>
+      `);
+    }
+
+    async function payCommission(adminId) {
+      const amount = parseFloat(document.getElementById('payCommissionAmount').value);
+      const note = document.getElementById('payCommissionNote').value;
+
+      if (!amount || amount <= 0) {
+        showToast('กรุณากรอกจำนวนเงิน', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/pay-commission', {
+        adminId,
+        amount,
+        note
+      }, 'กำลังบันทึก...');
+
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadAllCommissionData();
+      } else {
+        showToast(data.error, 'error');
       }
     }
 

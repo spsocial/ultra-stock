@@ -13,7 +13,8 @@ const SHEETS = {
   PACKAGES: 'Packages',
   SETTINGS: 'Settings',
   PAYMENT_LOGS: 'PaymentLogs',       // บันทึกการชำระเงิน + SlipRef ป้องกันสลิปซ้ำ
-  PENDING_ORDERS: 'PendingOrders'    // รอชำระ (สำหรับ Customer)
+  PENDING_ORDERS: 'PendingOrders',   // รอชำระ (สำหรับ Customer)
+  COMMISSION_PAYMENTS: 'CommissionPayments'  // บันทึกการจ่ายค่าคอมให้ Admin
 };
 
 // Get Spreadsheet
@@ -46,7 +47,8 @@ function initializeSheet(sheet, sheetName) {
     [SHEETS.PACKAGES]: ['Id', 'Name', 'Days', 'ResellerPrice', 'CustomerPrice', 'Active'],
     [SHEETS.SETTINGS]: ['Key', 'Value'],
     [SHEETS.PAYMENT_LOGS]: ['Id', 'UserId', 'UserName', 'UserRole', 'Amount', 'SlipRef', 'Status', 'VerifiedAt', 'TransactionIds'],
-    [SHEETS.PENDING_ORDERS]: ['Id', 'UserId', 'UserName', 'SubEmailIds', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'ExpiresAt', 'PaidAt', 'SlipRef']
+    [SHEETS.PENDING_ORDERS]: ['Id', 'UserId', 'UserName', 'SubEmailIds', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'ExpiresAt', 'PaidAt', 'SlipRef'],
+    [SHEETS.COMMISSION_PAYMENTS]: ['Id', 'AdminId', 'AdminName', 'Amount', 'Note', 'PaidBy', 'PaidAt', 'Month']
   };
 
   if (headers[sheetName]) {
@@ -2038,4 +2040,320 @@ function getDashboardStatsEnhanced(data) {
       newUsersThisMonth
     }
   };
+}
+
+// ===============================================
+// RENEWAL BY EMAIL
+// ===============================================
+
+function renewOrderByEmail(data) {
+  const { email, packageDays, userId, userRole, slipRef, paidAmount } = data;
+
+  const ordersSheet = getSheet(SHEETS.ORDERS);
+  const ordersData = ordersSheet.getDataRange().getValues();
+  const ordersHeaders = ordersData[0];
+
+  // Find column indices
+  const subEmailCol = ordersHeaders.indexOf('SubEmail');
+  const expiresAtCol = ordersHeaders.indexOf('ExpiresAt');
+  const statusCol = ordersHeaders.indexOf('Status');
+
+  // Find the order for this email
+  let orderRow = -1;
+  for (let i = 1; i < ordersData.length; i++) {
+    if (ordersData[i][subEmailCol] === email) {
+      orderRow = i + 1;
+      break;
+    }
+  }
+
+  if (orderRow === -1) {
+    return { success: false, error: 'ไม่พบอีเมลนี้ในระบบ' };
+  }
+
+  // Get current expiry
+  const currentExpiry = new Date(ordersData[orderRow - 1][expiresAtCol]);
+  const now = new Date();
+
+  // Calculate new expiry (from current expiry if still valid, or from now if expired)
+  const baseDate = currentExpiry > now ? currentExpiry : now;
+  const newExpiry = new Date(baseDate);
+  newExpiry.setDate(newExpiry.getDate() + packageDays);
+
+  // Update the order
+  ordersSheet.getRange(orderRow, expiresAtCol + 1).setValue(newExpiry.toISOString());
+  ordersSheet.getRange(orderRow, statusCol + 1).setValue('active');
+
+  // Get package price for commission calculation
+  const packagesSheet = getSheet(SHEETS.PACKAGES);
+  const packagesData = packagesSheet.getDataRange().getValues();
+  let packagePrice = 0;
+
+  for (let i = 1; i < packagesData.length; i++) {
+    if (packagesData[i][2] === packageDays) { // Days column
+      packagePrice = userRole === 'customer' ? packagesData[i][4] : packagesData[i][3]; // CustomerPrice or ResellerPrice
+      break;
+    }
+  }
+
+  // Handle commission for renewal (50% for admin)
+  if (userRole === 'admin' || userRole === 'super_admin') {
+    const user = findUserById(userId);
+    if (user) {
+      const commissions = JSON.parse(user.commissions || '{}');
+      const commissionRate = (commissions.rate || 0) / 100;
+      const commissionAmount = Math.round(packagePrice * commissionRate * 0.5); // 50% for renewal
+
+      if (commissionAmount > 0) {
+        const commissionSheet = getSheet(SHEETS.COMMISSION_LOG);
+        commissionSheet.appendRow([
+          generateId(),
+          userId,
+          user.username,
+          '', // OrderId
+          email,
+          packageDays,
+          commissionAmount,
+          new Date().toISOString(),
+          'renewal'
+        ]);
+      }
+    }
+  }
+
+  // Handle Reseller - add to balance
+  if (userRole === 'reseller') {
+    const transactionsSheet = getSheet(SHEETS.TRANSACTIONS);
+    transactionsSheet.appendRow([
+      generateId(),
+      userId,
+      findUserById(userId)?.username || 'Unknown',
+      '', // OrderId
+      email,
+      packageDays,
+      packagePrice,
+      'unpaid',
+      new Date().toISOString(),
+      '',
+      slipRef || '',
+      'renewal'
+    ]);
+  }
+
+  return {
+    success: true,
+    message: `ต่ออายุสำเร็จ! หมดอายุใหม่: ${formatDateThai(newExpiry)}`,
+    newExpiry: newExpiry.toISOString()
+  };
+}
+
+// ===============================================
+// COMMISSION PAYMENT SYSTEM
+// ===============================================
+
+// Get Admin Commission Stats (includes paid/unpaid/bonus)
+function getAdminCommissionStats(data) {
+  const { userId, month } = data;
+
+  const user = findUserById(userId);
+  if (!user) {
+    return { success: false, error: 'ไม่พบผู้ใช้' };
+  }
+
+  // Get all commission logs for this admin
+  const commissionSheet = getSheet(SHEETS.COMMISSION_LOG);
+  const commissionData = commissionSheet.getDataRange().getValues();
+  const commissionHeaders = commissionData[0];
+
+  const adminIdCol = commissionHeaders.indexOf('AdminId');
+  const amountCol = commissionHeaders.indexOf('Amount');
+  const createdAtCol = commissionHeaders.indexOf('CreatedAt');
+  const typeCol = commissionHeaders.indexOf('Type');
+
+  // Filter for this admin and month
+  const targetMonth = month || new Date().toISOString().substring(0, 7);
+  let totalEarned = 0;
+  let salesCommission = 0;
+  let renewalCommission = 0;
+
+  for (let i = 1; i < commissionData.length; i++) {
+    if (commissionData[i][adminIdCol] === userId) {
+      const createdAt = commissionData[i][createdAtCol];
+      if (createdAt && createdAt.substring(0, 7) === targetMonth) {
+        const amount = parseFloat(commissionData[i][amountCol]) || 0;
+        totalEarned += amount;
+
+        const type = commissionData[i][typeCol];
+        if (type === 'renewal') {
+          renewalCommission += amount;
+        } else {
+          salesCommission += amount;
+        }
+      }
+    }
+  }
+
+  // Get payments for this admin
+  const paymentsSheet = getSheet(SHEETS.COMMISSION_PAYMENTS);
+  const paymentsData = paymentsSheet.getDataRange().getValues();
+  const paymentHeaders = paymentsData[0];
+
+  const paymentAdminIdCol = paymentHeaders.indexOf('AdminId');
+  const paymentAmountCol = paymentHeaders.indexOf('Amount');
+  const paymentMonthCol = paymentHeaders.indexOf('Month');
+  const paymentNoteCol = paymentHeaders.indexOf('Note');
+  const paymentPaidAtCol = paymentHeaders.indexOf('PaidAt');
+
+  let totalPaid = 0;
+  let payments = [];
+
+  for (let i = 1; i < paymentsData.length; i++) {
+    if (paymentsData[i][paymentAdminIdCol] === userId) {
+      const paymentMonth = paymentsData[i][paymentMonthCol];
+      if (paymentMonth === targetMonth) {
+        const amount = parseFloat(paymentsData[i][paymentAmountCol]) || 0;
+        totalPaid += amount;
+        payments.push({
+          amount,
+          note: paymentsData[i][paymentNoteCol],
+          paidAt: paymentsData[i][paymentPaidAtCol]
+        });
+      }
+    }
+  }
+
+  // Calculate
+  const unpaid = Math.max(0, totalEarned - totalPaid);
+  const bonus = Math.max(0, totalPaid - totalEarned);
+
+  return {
+    success: true,
+    stats: {
+      adminId: userId,
+      adminName: user.username,
+      month: targetMonth,
+      totalEarned,
+      salesCommission,
+      renewalCommission,
+      totalPaid,
+      unpaid,
+      bonus,
+      payments
+    }
+  };
+}
+
+// Get All Admins Commission Stats (Owner only)
+function getAllAdminsCommissionStats(data) {
+  const { month } = data;
+  const targetMonth = month || new Date().toISOString().substring(0, 7);
+
+  const adminsSheet = getSheet(SHEETS.ADMINS);
+  const adminsData = adminsSheet.getDataRange().getValues();
+
+  const admins = [];
+
+  for (let i = 1; i < adminsData.length; i++) {
+    const role = adminsData[i][3]; // Role column
+    if (role === 'admin' || role === 'super_admin') {
+      const userId = adminsData[i][0];
+      const stats = getAdminCommissionStats({ userId, month: targetMonth });
+      if (stats.success) {
+        admins.push(stats.stats);
+      }
+    }
+  }
+
+  // Calculate totals
+  const totals = {
+    totalEarned: admins.reduce((sum, a) => sum + a.totalEarned, 0),
+    totalPaid: admins.reduce((sum, a) => sum + a.totalPaid, 0),
+    totalUnpaid: admins.reduce((sum, a) => sum + a.unpaid, 0),
+    totalBonus: admins.reduce((sum, a) => sum + a.bonus, 0)
+  };
+
+  return {
+    success: true,
+    month: targetMonth,
+    admins,
+    totals
+  };
+}
+
+// Pay Commission to Admin
+function payCommissionToAdmin(data) {
+  const { adminId, amount, note, paidBy, paidAt } = data;
+
+  const user = findUserById(adminId);
+  if (!user) {
+    return { success: false, error: 'ไม่พบผู้ใช้' };
+  }
+
+  // Get current month
+  const currentMonth = new Date().toISOString().substring(0, 7);
+
+  const paymentsSheet = getSheet(SHEETS.COMMISSION_PAYMENTS);
+  paymentsSheet.appendRow([
+    generateId(),
+    adminId,
+    user.username,
+    amount,
+    note || '',
+    paidBy,
+    paidAt || new Date().toISOString(),
+    currentMonth
+  ]);
+
+  return {
+    success: true,
+    message: `จ่ายค่าคอม ฿${amount.toLocaleString()} ให้ ${user.username} สำเร็จ!`
+  };
+}
+
+// Get Commission Payments History
+function getCommissionPayments(data) {
+  const { userId } = data;
+
+  const paymentsSheet = getSheet(SHEETS.COMMISSION_PAYMENTS);
+  const paymentsData = paymentsSheet.getDataRange().getValues();
+  const headers = paymentsData[0];
+
+  const adminIdCol = headers.indexOf('AdminId');
+  const amountCol = headers.indexOf('Amount');
+  const noteCol = headers.indexOf('Note');
+  const paidAtCol = headers.indexOf('PaidAt');
+  const monthCol = headers.indexOf('Month');
+
+  const payments = [];
+
+  for (let i = 1; i < paymentsData.length; i++) {
+    if (paymentsData[i][adminIdCol] === userId) {
+      payments.push({
+        amount: parseFloat(paymentsData[i][amountCol]) || 0,
+        note: paymentsData[i][noteCol],
+        paidAt: paymentsData[i][paidAtCol],
+        month: paymentsData[i][monthCol]
+      });
+    }
+  }
+
+  // Sort by date descending
+  payments.sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt));
+
+  return {
+    success: true,
+    payments
+  };
+}
+
+// Helper function to format date in Thai
+function formatDateThai(date) {
+  const d = new Date(date);
+  return d.toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }

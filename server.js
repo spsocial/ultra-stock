@@ -750,7 +750,7 @@ app.delete('/api/customer/pending-order/:id', authenticateToken, async (req, res
 
 // ============ RENEWAL ROUTES ============
 
-// Renew Order
+// Renew Order by ID (old endpoint)
 app.post('/api/orders/:id/renew', authenticateToken, async (req, res) => {
   const { packageDays, slipRef } = req.body;
 
@@ -761,6 +761,66 @@ app.post('/api/orders/:id/renew', authenticateToken, async (req, res) => {
     userRole: req.user.role,
     slipRef
   });
+
+  res.json(result);
+});
+
+// Renew Order by Email (for Admin/Reseller)
+app.post('/api/orders/renew', authenticateToken, async (req, res) => {
+  const { email, packageDays } = req.body;
+
+  const result = await callGoogleScript('renewOrderByEmail', {
+    email,
+    packageDays,
+    userId: req.user.id,
+    userRole: req.user.role
+  });
+
+  res.json(result);
+});
+
+// Renew Order with Payment (for Customer - EasySlip verification)
+app.post('/api/orders/renew-with-payment', authenticateToken, async (req, res) => {
+  const { email, packageDays, amount, slipImage } = req.body;
+
+  if (!slipImage) {
+    return res.status(400).json({ success: false, error: 'กรุณาแนบรูปสลิป' });
+  }
+
+  // Verify slip with EasySlip
+  const slipResult = await verifySlipWithEasySlip(slipImage);
+  if (!slipResult.success) {
+    return res.json(slipResult);
+  }
+
+  // Verify amount
+  if (slipResult.amount < amount) {
+    return res.json({
+      success: false,
+      error: `ยอดเงินไม่ตรง: โอน ฿${slipResult.amount.toLocaleString()} แต่ต้องจ่าย ฿${amount.toLocaleString()}`
+    });
+  }
+
+  // Process renewal
+  const result = await callGoogleScript('renewOrderByEmail', {
+    email,
+    packageDays,
+    userId: req.user.id,
+    userRole: req.user.role,
+    slipRef: slipResult.transRef,
+    paidAmount: slipResult.amount
+  });
+
+  // Log payment
+  if (result.success) {
+    await callGoogleScript('savePaymentLog', {
+      userId: req.user.id,
+      type: 'renewal',
+      amount: slipResult.amount,
+      slipRef: slipResult.transRef,
+      description: `ต่ออายุ ${email} - ${packageDays} วัน`
+    });
+  }
 
   res.json(result);
 });
@@ -793,6 +853,69 @@ app.post('/api/users/:id/reset-password', authenticateToken, requireRole('owner'
   const result = await callGoogleScript('resetUserPassword', {
     userId: req.params.id,
     newPassword
+  });
+
+  res.json(result);
+});
+
+// ============ COMMISSION PAYMENT SYSTEM ============
+
+// Get Admin Commission Stats (for Owner to view all admins, or admin to view self)
+app.get('/api/admin-commission/:userId', authenticateToken, async (req, res) => {
+  const targetUserId = req.params.userId;
+
+  // Only owner can view other users' commission, others can only view their own
+  if (req.user.role !== 'owner' && req.user.id !== targetUserId) {
+    return res.status(403).json({ success: false, error: 'ไม่มีสิทธิ์ดูข้อมูลนี้' });
+  }
+
+  const result = await callGoogleScript('getAdminCommissionStats', {
+    userId: targetUserId,
+    month: req.query.month
+  });
+
+  res.json(result);
+});
+
+// Get All Admins Commission Summary (Owner only)
+app.get('/api/all-admins-commission', authenticateToken, requireRole('owner'), async (req, res) => {
+  const result = await callGoogleScript('getAllAdminsCommissionStats', {
+    month: req.query.month
+  });
+
+  res.json(result);
+});
+
+// Pay Commission to Admin (Owner only)
+app.post('/api/pay-commission', authenticateToken, requireRole('owner'), async (req, res) => {
+  const { adminId, amount, note } = req.body;
+
+  if (!adminId || !amount) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอกข้อมูลให้ครบ' });
+  }
+
+  const result = await callGoogleScript('payCommissionToAdmin', {
+    adminId,
+    amount: parseFloat(amount),
+    note: note || '',
+    paidBy: req.user.id,
+    paidAt: new Date().toISOString()
+  });
+
+  res.json(result);
+});
+
+// Get Commission Payment History
+app.get('/api/commission-payments/:userId', authenticateToken, async (req, res) => {
+  const targetUserId = req.params.userId;
+
+  // Only owner can view other users' payments, others can only view their own
+  if (req.user.role !== 'owner' && req.user.id !== targetUserId) {
+    return res.status(403).json({ success: false, error: 'ไม่มีสิทธิ์ดูข้อมูลนี้' });
+  }
+
+  const result = await callGoogleScript('getCommissionPayments', {
+    userId: targetUserId
   });
 
   res.json(result);
