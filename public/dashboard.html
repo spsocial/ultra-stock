@@ -8,6 +8,14 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">กำลังโหลด...</div>
+    </div>
+  </div>
+
   <button class="mobile-menu-btn" onclick="toggleSidebar()">Menu</button>
 
   <div class="app-container">
@@ -706,44 +714,81 @@
       document.getElementById('sidebar').classList.toggle('open');
     }
 
+    // =============== LOADING ===============
+    let loadingCount = 0;
+
+    function showLoading(text = 'กำลังโหลด...') {
+      loadingCount++;
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      document.querySelector('.loading-text').textContent = text;
+    }
+
+    function hideLoading() {
+      loadingCount--;
+      if (loadingCount <= 0) {
+        loadingCount = 0;
+        document.getElementById('loadingOverlay').style.display = 'none';
+      }
+    }
+
     // =============== API HELPERS ===============
-    async function apiGet(endpoint) {
-      const response = await fetch(API_URL + endpoint, {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      return response.json();
+    async function apiGet(endpoint, showLoader = true) {
+      if (showLoader) showLoading();
+      try {
+        const response = await fetch(API_URL + endpoint, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        return response.json();
+      } finally {
+        if (showLoader) hideLoading();
+      }
     }
 
-    async function apiPost(endpoint, data) {
-      const response = await fetch(API_URL + endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      return response.json();
+    async function apiPost(endpoint, data, loadingText = 'กำลังดำเนินการ...') {
+      showLoading(loadingText);
+      try {
+        const response = await fetch(API_URL + endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+        return response.json();
+      } finally {
+        hideLoading();
+      }
     }
 
-    async function apiPut(endpoint, data) {
-      const response = await fetch(API_URL + endpoint, {
-        method: 'PUT',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      return response.json();
+    async function apiPut(endpoint, data, loadingText = 'กำลังบันทึก...') {
+      showLoading(loadingText);
+      try {
+        const response = await fetch(API_URL + endpoint, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+        return response.json();
+      } finally {
+        hideLoading();
+      }
     }
 
     async function apiDelete(endpoint) {
-      const response = await fetch(API_URL + endpoint, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      return response.json();
+      showLoading('กำลังลบ...');
+      try {
+        const response = await fetch(API_URL + endpoint, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        return response.json();
+      } finally {
+        hideLoading();
+      }
     }
 
     // =============== TOAST ===============
@@ -928,7 +973,7 @@
         packageDays: selectedPackage,
         customerName,
         saleType
-      });
+      }, 'กำลังดำเนินการซื้อ...');
 
       if (data.success) {
         // Show result modal with nice format
