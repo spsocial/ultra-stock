@@ -182,9 +182,19 @@ function doPost(e) {
 
       // Renewal
       case 'renewOrder': result = renewOrder(data); break;
+      case 'renewOrderByEmail': result = renewOrderByEmail(data); break;
 
       // Enhanced Dashboard Stats
       case 'getDashboardStatsEnhanced': result = getDashboardStatsEnhanced(data); break;
+
+      // Commission Payment System
+      case 'getAdminCommissionStats': result = getAdminCommissionStats(data); break;
+      case 'getAllAdminsCommissionStats': result = getAllAdminsCommissionStats(data); break;
+      case 'payCommissionToAdmin': result = payCommissionToAdmin(data); break;
+      case 'getCommissionPayments': result = getCommissionPayments(data); break;
+
+      // User Password Reset
+      case 'resetUserPassword': result = resetUserPassword(data.userId, data.newPassword); break;
 
       default:
         result = { success: false, error: 'Unknown action: ' + action };
