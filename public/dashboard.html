@@ -66,15 +66,11 @@
           </a>
         </div>
 
-        <div class="nav-section" id="navCustomerSection" style="display:none;">
-          <div class="nav-section-title">Customer</div>
+        <div class="nav-section" id="navResellerSection" style="display:none;">
+          <div class="nav-section-title">Reseller</div>
           <a href="#" class="nav-link" data-page="pending-payment">
             <span class="icon">⏳</span> รอชำระเงิน
           </a>
-        </div>
-
-        <div class="nav-section" id="navResellerSection" style="display:none;">
-          <div class="nav-section-title">Reseller</div>
           <a href="#" class="nav-link" data-page="my-balance">
             <span class="icon">💳</span> ยอดค้างชำระ
           </a>
@@ -905,9 +901,6 @@
     }
     if (user.role === 'reseller') {
       document.getElementById('navResellerSection').style.display = 'block';
-    }
-    if (user.role === 'customer') {
-      document.getElementById('navCustomerSection').style.display = 'block';
     }
     if (isOwnerOrSuper) {
       document.getElementById('navAdminSection').style.display = 'block';
