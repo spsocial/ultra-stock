@@ -223,6 +223,9 @@ function getDashboardStats(userId, role) {
   const subEmailsSheet = getSheet(SHEETS.SUB_EMAILS);
   const subEmailsData = subEmailsSheet.getDataRange().getValues();
 
+  const mainEmailsSheet = getSheet(SHEETS.MAIN_EMAILS);
+  const mainEmailsData = mainEmailsSheet.getDataRange().getValues();
+
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -274,6 +277,79 @@ function getDashboardStats(userId, role) {
     }
   }
 
+  // Count main email capacity (for owner/super_admin)
+  let mainEmailStats = null;
+  if (role === 'owner' || role === 'super_admin') {
+    // Count sub emails per main email (stock vs sold)
+    const subStatsByMain = {};
+    for (let i = 1; i < subEmailsData.length; i++) {
+      const mainId = subEmailsData[i][1];
+      const status = subEmailsData[i][4];
+      if (!subStatsByMain[mainId]) {
+        subStatsByMain[mainId] = { stock: 0, sold: 0, total: 0 };
+      }
+      subStatsByMain[mainId].total++;
+      if (status === 'stock') {
+        subStatsByMain[mainId].stock++;
+      } else {
+        subStatsByMain[mainId].sold++;
+      }
+    }
+
+    const mainEmails = [];
+    let totalMainEmails = 0;
+    let fullMainEmails = 0;
+    let totalAvailableSlots = 0;
+    let totalStock = 0;
+    let totalSold = 0;
+
+    for (let i = 1; i < mainEmailsData.length; i++) {
+      const id = mainEmailsData[i][0];
+      const email = mainEmailsData[i][1];
+      const capacity = mainEmailsData[i][3] || 50;
+      const stats = subStatsByMain[id] || { stock: 0, sold: 0, total: 0 };
+      const used = stats.total;
+      const available = capacity - used;
+
+      totalMainEmails++;
+      totalAvailableSlots += available;
+      totalStock += stats.stock;
+      totalSold += stats.sold;
+
+      if (available === 0) {
+        fullMainEmails++;
+      }
+
+      mainEmails.push({
+        id,
+        email,
+        capacity,
+        used,
+        available,
+        stock: stats.stock,
+        sold: stats.sold,
+        isFull: available === 0
+      });
+    }
+
+    // Sort: full ones first, then by available slots ascending
+    mainEmails.sort((a, b) => {
+      if (a.isFull && !b.isFull) return -1;
+      if (!a.isFull && b.isFull) return 1;
+      return a.available - b.available;
+    });
+
+    mainEmailStats = {
+      totalMainEmails,
+      fullMainEmails,
+      availableMainEmails: totalMainEmails - fullMainEmails,
+      totalAvailableSlots,
+      totalStock,
+      totalSold,
+      mainEmails
+    };
+  }
+
   const stats = {
     totalSales,
     monthSales,
@@ -284,6 +360,7 @@ function getDashboardStats(userId, role) {
   // Add role-specific stats
   if (role === 'owner' || role === 'super_admin') {
     stats.totalCommission = totalCommission;
+    stats.mainEmailStats = mainEmailStats;
   }
 
   if (role !== 'owner') {
@@ -1203,6 +1280,63 @@ function sendExpiryNotification() {
 // Daily trigger for expiry notification
 function dailyExpiryCheck() {
   sendExpiryNotification();
+}
+
+// Hourly stock report - ตั้ง trigger ให้ทำงานทุกชั่วโมง
+function hourlyStockReport() {
+  const settings = getSettings().settings;
+
+  if (!settings.telegramBotToken || !settings.telegramChatId) {
+    return;
+  }
+
+  // Get dashboard stats
+  const stats = getDashboardStats('system', 'owner').stats;
+  const mes = stats.mainEmailStats;
+
+  if (!mes) return;
+
+  const now = new Date();
+  const thaiTime = Utilities.formatDate(now, 'Asia/Bangkok', 'dd/MM/yyyy HH:mm');
+
+  let message = `📊 <b>ULTRA Stock Report</b>\n`;
+  message += `🕐 ${thaiTime}\n\n`;
+
+  message += `📈 <b>ยอดขาย</b>\n`;
+  message += `• ทั้งหมด: ${stats.totalSales || 0}\n`;
+  message += `• เดือนนี้: ${stats.monthSales || 0}\n\n`;
+
+  message += `📦 <b>สต็อก</b>\n`;
+  message += `• รอขาย: ${mes.totalStock || 0}\n`;
+  message += `• ขายแล้ว: ${mes.totalSold || 0}\n`;
+  message += `• Slots ว่าง: ${mes.totalAvailableSlots || 0}\n\n`;
+
+  message += `📧 <b>หัวเมล (${mes.totalMainEmails})</b>\n`;
+  if (mes.fullMainEmails > 0) {
+    message += `🔴 เต็ม: ${mes.fullMainEmails}\n`;
+  }
+
+  mes.mainEmails.forEach(m => {
+    const status = m.isFull ? '🔴' : m.available <= 10 ? '🟠' : '🟢';
+    const emailShort = m.email.split('@')[0];
+    message += `${status} ${emailShort}@... : ${m.used}/${m.capacity} (สต็อก ${m.stock}, ขาย ${m.sold}, ว่าง ${m.available})\n`;
+  });
+
+  if (stats.expiringCount > 0) {
+    message += `\n⏰ <b>ใกล้หมดอายุ:</b> ${stats.expiringCount} รายการ`;
+  }
+
+  const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage`;
+
+  UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      chat_id: settings.telegramChatId,
+      text: message,
+      parse_mode: 'HTML'
+    })
+  });
 }
 
 // =============== HELPER FUNCTIONS ===============

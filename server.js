@@ -414,6 +414,72 @@ app.post('/api/telegram/test', authenticateToken, requireRole('owner'), async (r
   }
 });
 
+// Send Stock Report to Telegram
+app.post('/api/send-stock-report', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
+  const { mainEmailStats, dashboardStats } = req.body;
+
+  // Get settings from Google Script
+  const settingsResult = await callGoogleScript('getSettings');
+  if (!settingsResult.success) {
+    return res.json({ success: false, error: 'ไม่สามารถโหลดการตั้งค่าได้' });
+  }
+
+  const { telegramBotToken, telegramChatId } = settingsResult.settings;
+  if (!telegramBotToken || !telegramChatId) {
+    return res.json({ success: false, error: 'ยังไม่ได้ตั้งค่า Telegram' });
+  }
+
+  // Build message
+  const mes = mainEmailStats;
+  const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+
+  let message = `📊 <b>ULTRA Stock Report</b>\n`;
+  message += `🕐 ${now}\n\n`;
+
+  message += `📈 <b>ยอดขาย</b>\n`;
+  message += `• ทั้งหมด: ${dashboardStats.totalSales || 0}\n`;
+  message += `• เดือนนี้: ${dashboardStats.monthSales || 0}\n\n`;
+
+  message += `📦 <b>สต็อก</b>\n`;
+  message += `• รอขาย: ${mes.totalStock || 0}\n`;
+  message += `• ขายแล้ว: ${mes.totalSold || 0}\n`;
+  message += `• Slots ว่าง: ${mes.totalAvailableSlots || 0}\n\n`;
+
+  message += `📧 <b>หัวเมล (${mes.totalMainEmails})</b>\n`;
+  if (mes.fullMainEmails > 0) {
+    message += `🔴 เต็ม: ${mes.fullMainEmails}\n`;
+  }
+
+  mes.mainEmails.forEach(m => {
+    const status = m.isFull ? '🔴' : m.available <= 10 ? '🟠' : '🟢';
+    message += `${status} ${m.email.split('@')[0]}@... : ${m.used}/${m.capacity} (ว่าง ${m.available})\n`;
+  });
+
+  if (dashboardStats.expiringCount > 0) {
+    message += `\n⏰ <b>ใกล้หมดอายุ:</b> ${dashboardStats.expiringCount} รายการ`;
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: telegramChatId,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+    const data = await response.json();
+    if (data.ok) {
+      res.json({ success: true, message: 'ส่งรายงานสำเร็จ' });
+    } else {
+      res.json({ success: false, error: data.description });
+    }
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
 // ============ STATIC PAGES ============
 
 app.get('/', (req, res) => {
