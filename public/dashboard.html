@@ -619,7 +619,11 @@
                   <label>🏦 บัญชีปลายทาง</label>
                   <div style="background:var(--bg-input);padding:16px;border-radius:12px;">
                     <p><strong>ธนาคาร:</strong> <span id="bankNameDisplay">-</span></p>
-                    <p><strong>เลขบัญชี:</strong> <code id="bankAccountDisplay" style="font-size:1.1rem;">-</code></p>
+                    <p style="display:flex;align-items:center;gap:10px;">
+                      <strong>เลขบัญชี:</strong>
+                      <code id="bankAccountDisplay" style="font-size:1.1rem;">-</code>
+                      <button class="btn btn-sm" onclick="copyBankAccount()" title="คัดลอกเลขบัญชี">📋</button>
+                    </p>
                     <p><strong>ชื่อบัญชี:</strong> <span id="bankAccountNameDisplay">-</span></p>
                   </div>
                 </div>
@@ -1492,6 +1496,13 @@
 
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => showToast('คัดลอกแล้ว!', 'success'));
+    }
+
+    function copyBankAccount() {
+      const accountNumber = document.getElementById('bankAccountDisplay').textContent;
+      if (accountNumber && accountNumber !== '-') {
+        navigator.clipboard.writeText(accountNumber).then(() => showToast('คัดลอกเลขบัญชีแล้ว!', 'success'));
+      }
     }
 
     // =============== SEARCH ===============
