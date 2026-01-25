@@ -232,7 +232,8 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
   const result = await callGoogleScript('getOrders', {
     userId: req.user.id,
     role: req.user.role,
-    filter: req.query.filter // 'all', 'mine', 'expiring'
+    filter: req.query.filter, // 'all', 'mine', 'expiring'
+    saleType: req.query.saleType // 'direct', 'stock', or undefined for all
   });
   res.json(result);
 });

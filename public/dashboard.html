@@ -186,34 +186,25 @@
       <div class="page hidden" id="page-buy">
         <div class="page-header">
           <h2>🛒 ซื้อซับเมล</h2>
-          <p>เลือกซับเมลที่ต้องการซื้อ</p>
+          <p>กรอกจำนวนและเลือกแพ็กเกจ</p>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 20px;">
-          <!-- Stock List -->
-          <div>
-            <div class="card">
-              <div class="card-header">
-                <h3>📦 สต็อกพร้อมขาย</h3>
-                <span class="badge badge-primary" id="stockCount">0 รายการ</span>
-              </div>
-              <div class="card-body">
-                <div class="stock-grid" id="stockList">
-                  <div class="loading"><div class="spinner"></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Buy Panel -->
-          <div class="buy-panel">
-            <h3>🛒 รายการซื้อ</h3>
-
-            <div class="text-center mb-20">
-              <div class="selected-count" id="selectedCount">0</div>
-              <div class="text-muted">รายการที่เลือก</div>
+        <div class="card" style="max-width: 500px;">
+          <div class="card-body">
+            <!-- Stock Available -->
+            <div style="text-align:center; padding:20px; background:var(--dark); border-radius:12px; margin-bottom:20px;">
+              <div style="font-size:0.9rem; color:var(--text-muted);">สต็อกพร้อมขาย</div>
+              <div style="font-size:3rem; font-weight:bold; color:var(--success);" id="stockAvailable">0</div>
+              <div style="font-size:0.85rem; color:var(--text-muted);">รายการ</div>
             </div>
 
+            <!-- Quantity -->
+            <div class="form-group">
+              <label>จำนวนที่ต้องการ</label>
+              <input type="number" class="form-control" id="buyQuantity" value="1" min="1" style="font-size:1.5rem; text-align:center; padding:15px;">
+            </div>
+
+            <!-- Package Selection -->
             <div class="form-group">
               <label>แพ็กเกจ</label>
               <div class="package-options" id="packageOptions">
@@ -221,17 +212,19 @@
               </div>
             </div>
 
+            <!-- Customer Name -->
             <div class="form-group">
-              <label>ชื่อลูกค้า / หมายเหตุ</label>
+              <label>ชื่อลูกค้า / หมายเหตุ (ไม่บังคับ)</label>
               <input type="text" class="form-control" id="customerName" placeholder="ระบุชื่อลูกค้า">
             </div>
 
-            <div class="buy-buttons">
-              <button class="btn btn-primary btn-block" onclick="buyDirect()">
+            <!-- Buy Buttons -->
+            <div style="display:flex; gap:10px; margin-top:20px;">
+              <button class="btn btn-primary" style="flex:1;" onclick="buyDirect()">
                 🛒 ซื้อ (นับคอม)
               </button>
-              <button class="btn btn-secondary btn-block" id="btnBuyStock" onclick="buyStock()">
-                📦 ซื้อลงสต็อก (ไม่นับคอม)
+              <button class="btn btn-secondary" id="btnBuyStock" style="flex:1;" onclick="buyStock()">
+                📦 ลงสต็อก
               </button>
             </div>
           </div>
@@ -263,27 +256,21 @@
       <div class="page hidden" id="page-history">
         <div class="page-header">
           <h2>📋 ประวัติการซื้อ</h2>
-          <p>รายการที่คุณซื้อไป</p>
+          <p>รายการคำสั่งซื้อของคุณ</p>
         </div>
 
         <div class="card">
+          <div class="card-header">
+            <h3>รายการคำสั่งซื้อ</h3>
+            <select class="form-control" style="width:auto;" id="historyFilter" onchange="loadHistory()">
+              <option value="all">ทั้งหมด</option>
+              <option value="direct">ขายตรง (นับคอม)</option>
+              <option value="stock">ลงสต็อก (ไม่นับคอม)</option>
+            </select>
+          </div>
           <div class="card-body">
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ซับเมล</th>
-                    <th>ลูกค้า</th>
-                    <th>แพ็ก</th>
-                    <th>ประเภท</th>
-                    <th>หมดอายุ</th>
-                    <th>สถานะ</th>
-                  </tr>
-                </thead>
-                <tbody id="historyTable">
-                  <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
-                </tbody>
-              </table>
+            <div id="historyList">
+              <div class="loading"><div class="spinner"></div></div>
             </div>
           </div>
         </div>
@@ -867,19 +854,28 @@
     }
 
     // =============== BUY PAGE ===============
+    let availableStock = [];
+
     async function loadBuyPage() {
       // Load packages
       const pkgData = await apiGet('/api/packages');
       if (pkgData.success) {
         packages = pkgData.packages.filter(p => p.active);
         renderPackageOptions();
+        // Select first package by default
+        if (packages.length > 0 && !selectedPackage) {
+          selectedPackage = packages[0].days;
+          renderPackageOptions();
+        }
       }
 
-      // Load stock
+      // Load stock count
       const stockData = await apiGet('/api/sub-emails?status=stock');
       if (stockData.success) {
-        document.getElementById('stockCount').textContent = stockData.emails.length + ' รายการ';
-        renderStockList(stockData.emails);
+        availableStock = stockData.emails;
+        document.getElementById('stockAvailable').textContent = stockData.emails.length;
+        // Set max quantity
+        document.getElementById('buyQuantity').max = stockData.emails.length;
       }
     }
 
@@ -899,38 +895,6 @@
       renderPackageOptions();
     }
 
-    function renderStockList(emails) {
-      const container = document.getElementById('stockList');
-      if (emails.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">📦</div><h3>ไม่มีสต็อก</h3></div>';
-        return;
-      }
-
-      container.innerHTML = emails.map(email => `
-        <div class="stock-item ${selectedSubEmails.includes(email.id) ? 'selected' : ''}"
-             onclick="toggleStockItem('${email.id}')">
-          <div class="stock-item-header">
-            <input type="checkbox" ${selectedSubEmails.includes(email.id) ? 'checked' : ''}
-                   onclick="event.stopPropagation(); toggleStockItem('${email.id}')">
-            <span class="stock-email">${email.email}</span>
-          </div>
-          <div class="stock-password">Password: ${email.password}</div>
-          <div class="stock-main-email">หัวเมล: ${email.mainEmail}</div>
-        </div>
-      `).join('');
-    }
-
-    function toggleStockItem(id) {
-      const index = selectedSubEmails.indexOf(id);
-      if (index > -1) {
-        selectedSubEmails.splice(index, 1);
-      } else {
-        selectedSubEmails.push(id);
-      }
-      document.getElementById('selectedCount').textContent = selectedSubEmails.length;
-      loadBuyPage(); // Re-render
-    }
-
     async function buyDirect() {
       await doBuy('direct');
     }
@@ -940,8 +904,14 @@
     }
 
     async function doBuy(saleType) {
-      if (selectedSubEmails.length === 0) {
-        showToast('กรุณาเลือกซับเมล', 'warning');
+      const quantity = parseInt(document.getElementById('buyQuantity').value) || 1;
+
+      if (quantity < 1) {
+        showToast('กรุณาระบุจำนวน', 'warning');
+        return;
+      }
+      if (quantity > availableStock.length) {
+        showToast(`สต็อกไม่พอ (มี ${availableStock.length} รายการ)`, 'warning');
         return;
       }
       if (!selectedPackage) {
@@ -949,47 +919,57 @@
         return;
       }
 
+      // Get first N stock items
+      const subEmailIds = availableStock.slice(0, quantity).map(e => e.id);
       const customerName = document.getElementById('customerName').value;
 
       const data = await apiPost('/api/orders', {
-        subEmailIds: selectedSubEmails,
+        subEmailIds,
         packageDays: selectedPackage,
         customerName,
         saleType
       });
 
       if (data.success) {
-        showToast(data.message, 'success');
+        // Show result modal with nice format
+        const pkg = packages.find(p => p.days === selectedPackage);
+        const expiryDate = formatDate(data.orders[0]?.expiresAt);
 
-        // Show result modal
         const resultHtml = `
-          <div style="text-align:center;margin-bottom:20px;">
-            <div style="font-size:3rem;">✅</div>
-            <h3>ซื้อสำเร็จ ${data.orders.length} รายการ</h3>
+          <div style="text-align:center;margin-bottom:25px;">
+            <div style="font-size:4rem;">✅</div>
+            <h3 style="margin:10px 0;">ซื้อสำเร็จ ${data.orders.length} รายการ</h3>
+            <p style="color:var(--text-muted);">แพ็กเกจ ${pkg?.name || selectedPackage + ' วัน'} | หมดอายุ ${expiryDate}</p>
           </div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Email</th><th>Password</th><th>หมดอายุ</th></tr></thead>
-              <tbody>
-                ${data.orders.map(o => `
-                  <tr>
-                    <td><code>${o.email}</code></td>
-                    <td>${o.password}</td>
-                    <td>${formatDate(o.expiresAt)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+
+          <div style="background:var(--dark); border-radius:12px; padding:20px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+              <span style="font-weight:600;">📧 รายละเอียดบัญชี</span>
+              <button class="btn btn-sm btn-primary" onclick="copyOrdersFormatted()">📋 Copy ทั้งหมด</button>
+            </div>
+            <div id="ordersForCopy" style="font-family:monospace; font-size:0.9rem; line-height:1.8;">
+              ${data.orders.map((o, i) => `
+                <div style="padding:10px; background:var(--card); border-radius:8px; margin-bottom:8px;">
+                  <div><strong>${i+1}.</strong></div>
+                  <div>Email: <code style="color:var(--primary)">${o.email}</code></div>
+                  <div>Password: <code>${o.password}</code></div>
+                </div>
+              `).join('')}
+            </div>
           </div>
-          <div class="mt-20 text-center">
-            <button class="btn btn-secondary" onclick="copyOrders(${JSON.stringify(data.orders).replace(/"/g, '&quot;')})">📋 Copy ทั้งหมด</button>
+
+          <div style="text-align:center;">
+            <button class="btn btn-secondary" onclick="hideModal()">ปิด</button>
           </div>
         `;
+
+        // Store orders for copy function
+        window.lastOrders = data.orders;
+
         showModal('🎉 ซื้อสำเร็จ', resultHtml);
 
         // Reset
-        selectedSubEmails = [];
-        document.getElementById('selectedCount').textContent = '0';
+        document.getElementById('buyQuantity').value = '1';
         document.getElementById('customerName').value = '';
         loadBuyPage();
       } else {
@@ -997,10 +977,15 @@
       }
     }
 
-    function copyOrders(orders) {
-      const text = orders.map(o => `${o.email}\n${o.password}`).join('\n\n');
+    function copyOrdersFormatted() {
+      if (!window.lastOrders) return;
+
+      const text = window.lastOrders.map((o, i) =>
+        `${i+1}.\nEmail: ${o.email}\nPassword: ${o.password}`
+      ).join('\n\n');
+
       navigator.clipboard.writeText(text);
-      showToast('Copied!', 'success');
+      showToast('Copied! พร้อมส่งให้ลูกค้า', 'success');
     }
 
     // =============== SEARCH ===============
@@ -1047,23 +1032,98 @@
 
     // =============== HISTORY ===============
     async function loadHistory() {
-      const data = await apiGet('/api/orders?filter=mine');
-      const tbody = document.getElementById('historyTable');
+      const filter = document.getElementById('historyFilter').value;
+      let url = '/api/orders?filter=mine';
+      if (filter !== 'all') url += '&saleType=' + filter;
+
+      const data = await apiGet(url);
+      const container = document.getElementById('historyList');
 
       if (data.success && data.orders.length > 0) {
-        tbody.innerHTML = data.orders.map(o => `
-          <tr>
-            <td><code>${o.subEmail}</code></td>
-            <td>${o.customerName || '-'}</td>
-            <td>${o.packageDays} วัน</td>
-            <td><span class="badge ${o.saleType === 'direct' ? 'badge-success' : 'badge-secondary'}">${o.saleType === 'direct' ? 'ขายตรง' : 'ลงสต็อก'}</span></td>
-            <td>${formatDate(o.expiresAt)}</td>
-            <td><span class="badge ${o.status === 'expired' ? 'badge-danger' : 'badge-success'}">${o.status}</span></td>
-          </tr>
+        // Group orders by orderId (same timestamp + soldBy = same order)
+        const grouped = {};
+        data.orders.forEach(o => {
+          const key = o.orderId || `${o.soldAt}_${o.soldBy}`;
+          if (!grouped[key]) {
+            grouped[key] = {
+              orderId: key,
+              soldAt: o.soldAt,
+              soldBy: o.soldBy,
+              customerName: o.customerName,
+              packageDays: o.packageDays,
+              saleType: o.saleType,
+              items: []
+            };
+          }
+          grouped[key].items.push({
+            email: o.subEmail,
+            password: o.password || '***',
+            expiresAt: o.expiresAt,
+            status: o.status
+          });
+        });
+
+        const orders = Object.values(grouped).sort((a, b) =>
+          new Date(b.soldAt) - new Date(a.soldAt)
+        );
+
+        container.innerHTML = orders.map((order, idx) => `
+          <div class="order-card" style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;">
+            <div class="order-header" onclick="toggleOrderDetail(${idx})" style="padding:15px;background:var(--card-bg);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+              <div style="display:flex;gap:15px;align-items:center;flex-wrap:wrap;">
+                <span style="font-weight:bold;">#${idx + 1}</span>
+                <span>${formatDate(order.soldAt)}</span>
+                <span class="badge ${order.saleType === 'direct' ? 'badge-success' : 'badge-secondary'}">${order.saleType === 'direct' ? 'ขายตรง' : 'ลงสต็อก'}</span>
+                <span><strong>${order.items.length}</strong> เมล</span>
+                <span>${order.packageDays} วัน</span>
+                ${order.customerName ? `<span>👤 ${order.customerName}</span>` : ''}
+              </div>
+              <span class="order-toggle" id="toggle-${idx}" style="font-size:1.2rem;">▼</span>
+            </div>
+            <div class="order-detail" id="order-detail-${idx}" style="display:none;padding:15px;background:var(--bg-color);border-top:1px solid var(--border);">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                <button class="btn btn-sm btn-primary" onclick="copyOrderEmails(${idx})">📋 คัดลอกทั้งหมด</button>
+              </div>
+              <div class="order-emails" id="order-emails-${idx}">
+                ${order.items.map((item, i) => `
+                  <div style="padding:10px;margin-bottom:8px;background:var(--card-bg);border-radius:6px;border-left:3px solid ${item.status === 'expired' ? 'var(--danger)' : 'var(--success)'};">
+                    <div><strong>${i + 1}.</strong> <code>${item.email}</code></div>
+                    <div style="margin-top:5px;color:var(--text-muted);font-size:0.9rem;">Password: <code>${item.password}</code></div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
         `).join('');
+
+        // Store orders for copy function
+        window.historyOrders = orders;
       } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ยังไม่มีประวัติ</td></tr>';
+        container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><h3>ยังไม่มีประวัติการซื้อ</h3></div>';
       }
+    }
+
+    function toggleOrderDetail(idx) {
+      const detail = document.getElementById('order-detail-' + idx);
+      const toggle = document.getElementById('toggle-' + idx);
+      if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+        toggle.textContent = '▲';
+      } else {
+        detail.style.display = 'none';
+        toggle.textContent = '▼';
+      }
+    }
+
+    function copyOrderEmails(idx) {
+      const order = window.historyOrders[idx];
+      const text = order.items.map((item, i) =>
+        `${i + 1}.\nEmail: ${item.email}\nPassword: ${item.password}`
+      ).join('\n\n');
+
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('คัดลอกแล้ว!', 'success');
+      });
     }
 
     // =============== MAIN EMAILS ===============

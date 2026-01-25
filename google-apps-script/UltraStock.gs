@@ -122,7 +122,7 @@ function doPost(e) {
 
       // Orders
       case 'createOrder': result = createOrder(data); break;
-      case 'getOrders': result = getOrders(data.userId, data.role, data.filter); break;
+      case 'getOrders': result = getOrders(data.userId, data.role, data.filter, data.saleType); break;
       case 'extendOrder': result = extendOrder(data.orderId, data.days); break;
       case 'markOrderExpired': result = markOrderExpired(data.orderId); break;
 
@@ -665,6 +665,8 @@ function createOrder(data) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + packageDays * 24 * 60 * 60 * 1000);
 
+  // Generate batch ID for grouping all emails in this purchase
+  const batchOrderId = generateId();
   const results = [];
 
   for (const subEmailId of subEmailIds) {
@@ -680,7 +682,7 @@ function createOrder(data) {
           commissionAmount = adminCommissions[packageDays] || 0;
         }
 
-        // Create order
+        // Create order - each item gets unique ID but shares batchOrderId
         const orderId = generateId();
         ordersSheet.appendRow([
           orderId,
@@ -695,7 +697,8 @@ function createOrder(data) {
           saleType,
           commissionAmount,
           'active',
-          remark || ''
+          remark || '',
+          batchOrderId // Column 14: Group multiple items together
         ]);
 
         // Log commission if direct sale
@@ -752,9 +755,20 @@ function createOrder(data) {
   return { success: true, orders: results, message: `สั่งซื้อ ${results.length} รายการสำเร็จ` };
 }
 
-function getOrders(userId, role, filter) {
+function getOrders(userId, role, filter, saleType) {
   const sheet = getSheet(SHEETS.ORDERS);
   const data = sheet.getDataRange().getValues();
+
+  // Also get SubEmails sheet for password lookup
+  const subSheet = getSheet(SHEETS.SUB_EMAILS);
+  const subData = subSheet.getDataRange().getValues();
+  const subEmailMap = {};
+  for (let i = 1; i < subData.length; i++) {
+    subEmailMap[subData[i][0]] = {
+      email: subData[i][1],
+      password: subData[i][2]
+    };
+  }
 
   const now = new Date();
   const orders = [];
@@ -772,12 +786,22 @@ function getOrders(userId, role, filter) {
       if (daysUntilExpiry > 7 || data[i][11] === 'expired') continue;
     }
 
+    // Filter by saleType
+    if (saleType && data[i][9] !== saleType) {
+      continue;
+    }
+
+    // Get password from SubEmails
+    const subEmailInfo = subEmailMap[data[i][1]] || {};
+
     orders.push({
       id: data[i][0],
       subEmailId: data[i][1],
       subEmail: data[i][2],
+      password: subEmailInfo.password || '',
       adminId: data[i][3],
       adminName: data[i][4],
+      soldBy: data[i][4],
       customerName: data[i][5],
       packageDays: data[i][6],
       soldAt: data[i][7],
@@ -785,12 +809,13 @@ function getOrders(userId, role, filter) {
       saleType: data[i][9],
       commissionAmount: data[i][10],
       status: data[i][11],
-      remark: data[i][12]
+      remark: data[i][12],
+      orderId: data[i][13] || (data[i][7] + '_' + data[i][4]) // batchOrderId or timestamp+admin combo for old orders
     });
   }
 
-  // Sort by expiresAt
-  orders.sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt));
+  // Sort by soldAt descending (newest first)
+  orders.sort((a, b) => new Date(b.soldAt) - new Date(a.soldAt));
 
   return { success: true, orders };
 }
