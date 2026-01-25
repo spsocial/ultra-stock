@@ -66,10 +66,20 @@
           </a>
         </div>
 
+        <div class="nav-section" id="navCustomerSection" style="display:none;">
+          <div class="nav-section-title">Customer</div>
+          <a href="#" class="nav-link" data-page="pending-payment">
+            <span class="icon">⏳</span> รอชำระเงิน
+          </a>
+        </div>
+
         <div class="nav-section" id="navResellerSection" style="display:none;">
           <div class="nav-section-title">Reseller</div>
           <a href="#" class="nav-link" data-page="my-balance">
             <span class="icon">💳</span> ยอดค้างชำระ
+          </a>
+          <a href="#" class="nav-link" data-page="submit-payment">
+            <span class="icon">📤</span> แนบสลิปชำระ
           </a>
         </div>
 
@@ -86,6 +96,9 @@
           </a>
           <a href="#" class="nav-link" data-page="all-transactions">
             <span class="icon">📑</span> รายการตัวแทน
+          </a>
+          <a href="#" class="nav-link" data-page="bank-settings">
+            <span class="icon">🏦</span> บัญชีธนาคาร
           </a>
           <a href="#" class="nav-link" data-page="settings">
             <span class="icon">⚙️</span> ตั้งค่าระบบ
@@ -608,6 +621,85 @@
         </div>
       </div>
 
+      <!-- Customer: Pending Payment Page -->
+      <div class="page hidden" id="page-pending-payment">
+        <div class="page-header">
+          <h2>⏳ รอชำระเงิน</h2>
+          <p>คำสั่งซื้อที่รอการชำระเงิน</p>
+        </div>
+
+        <div id="pendingPaymentsList">
+          <div class="empty-state">
+            <div class="icon">✅</div>
+            <h3>ไม่มีรายการรอชำระ</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reseller: Submit Payment Page -->
+      <div class="page hidden" id="page-submit-payment">
+        <div class="page-header">
+          <h2>📤 แนบสลิปชำระเงิน</h2>
+          <p>ชำระยอดค้างทั้งหมด</p>
+        </div>
+
+        <div class="stats-grid mb-20" style="max-width:500px;">
+          <div class="stat-card danger">
+            <div class="stat-value" id="submitPaymentAmount">฿0</div>
+            <div class="stat-label">ยอดค้างชำระ</div>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:500px;" id="submitPaymentCard">
+          <div class="card-body">
+            <div class="form-group">
+              <label>ข้อมูลโอนเงิน</label>
+              <div id="bankAccountInfo" style="background:var(--dark);padding:15px;border-radius:8px;margin-bottom:15px;">
+                <p><strong>ธนาคาร:</strong> <span id="bankNameDisplay">-</span></p>
+                <p><strong>เลขบัญชี:</strong> <code id="bankAccountDisplay">-</code></p>
+                <p><strong>ชื่อบัญชี:</strong> <span id="bankAccountNameDisplay">-</span></p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>แนบรูปสลิป</label>
+              <input type="file" class="form-control" id="slipImageInput" accept="image/*" onchange="previewSlip(this)">
+              <div id="slipPreview" style="margin-top:10px;display:none;">
+                <img id="slipPreviewImg" style="max-width:100%;border-radius:8px;">
+              </div>
+            </div>
+
+            <button class="btn btn-success btn-block" onclick="submitResellerPayment()">✅ ยืนยันการชำระเงิน</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Owner: Bank Settings Page -->
+      <div class="page hidden" id="page-bank-settings">
+        <div class="page-header">
+          <h2>🏦 ตั้งค่าบัญชีธนาคาร</h2>
+          <p>บัญชีรับชำระเงินจาก Reseller และ Customer</p>
+        </div>
+
+        <div class="card" style="max-width:500px;">
+          <div class="card-body">
+            <div class="form-group">
+              <label>ชื่อธนาคาร</label>
+              <input type="text" class="form-control" id="editBankName" placeholder="ธ.กสิกรไทย, ธ.ไทยพาณิชย์, etc.">
+            </div>
+            <div class="form-group">
+              <label>เลขบัญชี</label>
+              <input type="text" class="form-control" id="editBankAccountNumber" placeholder="xxx-x-xxxxx-x">
+            </div>
+            <div class="form-group">
+              <label>ชื่อบัญชี</label>
+              <input type="text" class="form-control" id="editBankAccountName" placeholder="ชื่อ-นามสกุล">
+            </div>
+            <button class="btn btn-success btn-block" onclick="saveBankSettings()">💾 บันทึก</button>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -646,7 +738,8 @@
         'owner': 'Owner',
         'super_admin': 'Super Admin',
         'admin': 'Admin',
-        'reseller': 'Reseller'
+        'reseller': 'Reseller',
+        'customer': 'Customer'
       };
       return roles[role] || role;
     }
@@ -661,7 +754,14 @@
     if (user.role === 'reseller') {
       document.getElementById('navResellerSection').style.display = 'block';
     }
+    if (user.role === 'customer') {
+      document.getElementById('navCustomerSection').style.display = 'block';
+    }
     if (user.role === 'owner') {
+      document.getElementById('navAdminSection').style.display = 'block';
+    }
+    if (user.role === 'owner' || user.role === 'super_admin') {
+      // Show admin section for super_admin too (except some features)
       document.getElementById('navAdminSection').style.display = 'block';
     }
 
@@ -699,10 +799,13 @@
         case 'expiring': loadExpiring(); break;
         case 'my-commission': loadMyCommission(); break;
         case 'my-balance': loadMyBalance(); break;
+        case 'pending-payment': loadPendingPayments(); break;
+        case 'submit-payment': loadSubmitPayment(); break;
         case 'admins': loadAdmins(); break;
         case 'packages': loadPackages(); break;
         case 'commissions': loadCommissions(); break;
         case 'all-transactions': loadAllTransactions(); break;
+        case 'bank-settings': loadBankSettings(); break;
         case 'settings': loadSettings(); break;
       }
 
@@ -1901,6 +2004,230 @@ sub2@example.com:password2"></textarea>
         showToast('ส่งรายงานไป Telegram สำเร็จ', 'success');
       } else {
         showToast(data.error || 'ส่งไม่สำเร็จ', 'error');
+      }
+    }
+
+    // =============== CUSTOMER: PENDING PAYMENTS ===============
+    async function loadPendingPayments() {
+      const data = await apiGet('/api/customer/pending-orders');
+      const container = document.getElementById('pendingPaymentsList');
+
+      if (data.success && data.orders && data.orders.length > 0) {
+        container.innerHTML = data.orders.map(order => `
+          <div class="card mb-20">
+            <div class="card-body">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <div>
+                  <strong>${order.subEmailIds.length} เมล</strong> | ${order.packageDays} วัน
+                </div>
+                <div style="font-size:1.3rem;color:var(--warning);font-weight:bold;">
+                  ฿${order.amount.toLocaleString()}
+                </div>
+              </div>
+              <p class="text-muted" style="font-size:0.9rem;margin-bottom:15px;">
+                หมดเวลาชำระ: ${formatDate(order.expiresAt)}
+              </p>
+              <button class="btn btn-success btn-block" onclick="showPayOrderModal('${order.id}', ${order.amount})">
+                💳 ชำระเงิน
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><h3>ไม่มีรายการรอชำระ</h3></div>';
+      }
+    }
+
+    async function showPayOrderModal(orderId, amount) {
+      // Load bank account info
+      const bankData = await apiGet('/api/bank-account', false);
+      const bank = bankData.bankAccount || {};
+
+      showModal('ชำระเงิน', `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:2rem;font-weight:bold;color:var(--warning);">฿${amount.toLocaleString()}</div>
+          <p class="text-muted">ยอดที่ต้องชำระ</p>
+        </div>
+
+        <div style="background:var(--dark);padding:15px;border-radius:8px;margin-bottom:20px;">
+          <p><strong>ธนาคาร:</strong> ${bank.bankName || '-'}</p>
+          <p><strong>เลขบัญชี:</strong> <code>${bank.accountNumber || '-'}</code></p>
+          <p><strong>ชื่อบัญชี:</strong> ${bank.accountName || '-'}</p>
+        </div>
+
+        <div class="form-group">
+          <label>แนบรูปสลิป</label>
+          <input type="file" class="form-control" id="customerSlipInput" accept="image/*" onchange="previewCustomerSlip(this)">
+          <div id="customerSlipPreview" style="margin-top:10px;display:none;">
+            <img id="customerSlipPreviewImg" style="max-width:100%;border-radius:8px;">
+          </div>
+        </div>
+
+        <button class="btn btn-success btn-block" onclick="submitCustomerPayment('${orderId}')">✅ ยืนยันการชำระเงิน</button>
+      `);
+    }
+
+    function previewCustomerSlip(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('customerSlipPreviewImg').src = e.target.result;
+          document.getElementById('customerSlipPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function submitCustomerPayment(orderId) {
+      const fileInput = document.getElementById('customerSlipInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('กรุณาแนบรูปสลิป', 'warning');
+        return;
+      }
+
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        const data = await apiPost('/api/customer/pay-order', {
+          orderId,
+          slipImage: base64
+        }, 'กำลังตรวจสอบสลิป...');
+
+        if (data.success) {
+          showToast(data.message || 'ชำระเงินสำเร็จ!', 'success');
+          hideModal();
+          loadPendingPayments();
+
+          // Show purchased emails
+          if (data.orders && data.orders.length > 0) {
+            showPurchaseResult(data.orders);
+          }
+        } else {
+          showToast(data.error, 'error');
+        }
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    function showPurchaseResult(orders) {
+      const resultHtml = `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:3rem;">✅</div>
+          <h3>ซื้อสำเร็จ ${orders.length} รายการ</h3>
+        </div>
+        <div style="background:var(--dark);padding:15px;border-radius:8px;">
+          ${orders.map((o, i) => `
+            <div style="padding:10px;margin-bottom:8px;background:var(--card);border-radius:6px;">
+              <div><strong>${i + 1}.</strong> <code>${o.email}</code></div>
+              <div style="color:var(--text-muted);font-size:0.9rem;">Password: <code>${o.password}</code></div>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-primary btn-block mt-20" onclick="copyPurchaseResult()">📋 คัดลอกทั้งหมด</button>
+      `;
+      window.lastPurchaseOrders = orders;
+      showModal('รายการที่ซื้อ', resultHtml);
+    }
+
+    function copyPurchaseResult() {
+      const text = window.lastPurchaseOrders.map((o, i) =>
+        `${i + 1}.\nEmail: ${o.email}\nPassword: ${o.password}`
+      ).join('\n\n');
+      navigator.clipboard.writeText(text).then(() => showToast('คัดลอกแล้ว!', 'success'));
+    }
+
+    // =============== RESELLER: SUBMIT PAYMENT ===============
+    async function loadSubmitPayment() {
+      // Load unpaid amount
+      const unpaidData = await apiGet('/api/reseller/unpaid');
+      if (unpaidData.success) {
+        document.getElementById('submitPaymentAmount').textContent = '฿' + (unpaidData.unpaidAmount || 0).toLocaleString();
+
+        if (unpaidData.unpaidAmount === 0) {
+          document.getElementById('submitPaymentCard').innerHTML = `
+            <div class="empty-state">
+              <div class="icon">✅</div>
+              <h3>ไม่มียอดค้างชำระ</h3>
+            </div>
+          `;
+        }
+      }
+
+      // Load bank account
+      const bankData = await apiGet('/api/bank-account', false);
+      if (bankData.success && bankData.bankAccount) {
+        document.getElementById('bankNameDisplay').textContent = bankData.bankAccount.bankName || '-';
+        document.getElementById('bankAccountDisplay').textContent = bankData.bankAccount.accountNumber || '-';
+        document.getElementById('bankAccountNameDisplay').textContent = bankData.bankAccount.accountName || '-';
+      }
+    }
+
+    function previewSlip(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('slipPreviewImg').src = e.target.result;
+          document.getElementById('slipPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    async function submitResellerPayment() {
+      const fileInput = document.getElementById('slipImageInput');
+      if (!fileInput.files || !fileInput.files[0]) {
+        showToast('กรุณาแนบรูปสลิป', 'warning');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        const data = await apiPost('/api/reseller/submit-payment', {
+          slipImage: base64
+        }, 'กำลังตรวจสอบสลิป...');
+
+        if (data.success) {
+          showToast(data.message || 'ชำระเงินสำเร็จ!', 'success');
+          loadSubmitPayment();
+          // Clear file input
+          fileInput.value = '';
+          document.getElementById('slipPreview').style.display = 'none';
+        } else {
+          showToast(data.error, 'error');
+        }
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    // =============== BANK SETTINGS ===============
+    async function loadBankSettings() {
+      const data = await apiGet('/api/bank-account');
+      if (data.success && data.bankAccount) {
+        document.getElementById('editBankName').value = data.bankAccount.bankName || '';
+        document.getElementById('editBankAccountNumber').value = data.bankAccount.accountNumber || '';
+        document.getElementById('editBankAccountName').value = data.bankAccount.accountName || '';
+      }
+    }
+
+    async function saveBankSettings() {
+      const bankName = document.getElementById('editBankName').value;
+      const accountNumber = document.getElementById('editBankAccountNumber').value;
+      const accountName = document.getElementById('editBankAccountName').value;
+
+      const data = await apiPut('/api/bank-account', {
+        bankName,
+        accountNumber,
+        accountName
+      });
+
+      if (data.success) {
+        showToast('บันทึกข้อมูลธนาคารสำเร็จ', 'success');
+      } else {
+        showToast(data.error, 'error');
       }
     }
 
