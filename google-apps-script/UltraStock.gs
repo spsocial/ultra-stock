@@ -288,10 +288,13 @@ function getDashboardStats(userId, role) {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   let totalSales = 0;
+  let todaySales = 0;
   let monthSales = 0;
   let mySales = 0;
+  let myTodaySales = 0;
   let myMonthSales = 0;
   let totalCommission = 0;
   let myCommission = 0;
@@ -305,6 +308,9 @@ function getDashboardStats(userId, role) {
     totalSales++;
     totalCommission += commission;
 
+    if (orderDate >= startOfToday) {
+      todaySales++;
+    }
     if (orderDate >= startOfMonth) {
       monthSales++;
     }
@@ -312,6 +318,9 @@ function getDashboardStats(userId, role) {
     if (adminId === userId) {
       mySales++;
       myCommission += commission;
+      if (orderDate >= startOfToday) {
+        myTodaySales++;
+      }
       if (orderDate >= startOfMonth) {
         myMonthSales++;
       }
@@ -412,6 +421,7 @@ function getDashboardStats(userId, role) {
 
   const stats = {
     totalSales,
+    todaySales,
     monthSales,
     stockCount,
     expiringCount
@@ -425,6 +435,7 @@ function getDashboardStats(userId, role) {
 
   if (role !== 'owner') {
     stats.mySales = mySales;
+    stats.myTodaySales = myTodaySales;
     stats.myMonthSales = myMonthSales;
     stats.myCommission = myCommission;
   }

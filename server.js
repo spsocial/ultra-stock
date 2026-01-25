@@ -497,8 +497,9 @@ app.post('/api/send-stock-report', authenticateToken, requireRole('owner', 'supe
   message += `🕐 ${now}\n\n`;
 
   message += `📈 <b>ยอดขาย</b>\n`;
-  message += `• ทั้งหมด: ${dashboardStats.totalSales || 0}\n`;
-  message += `• เดือนนี้: ${dashboardStats.monthSales || 0}\n\n`;
+  message += `• วันนี้: ${dashboardStats.todaySales || 0}\n`;
+  message += `• เดือนนี้: ${dashboardStats.monthSales || 0}\n`;
+  message += `• ทั้งหมด: ${dashboardStats.totalSales || 0}\n\n`;
 
   message += `📦 <b>สต็อก</b>\n`;
   message += `• รอขาย: ${mes.totalStock || 0}\n`;

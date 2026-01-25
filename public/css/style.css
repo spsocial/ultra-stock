@@ -362,6 +362,10 @@ select.form-control {
   background: var(--gradient);
 }
 
+.stat-card.primary::before {
+  background: var(--primary);
+}
+
 .stat-card.success::before {
   background: var(--success);
 }

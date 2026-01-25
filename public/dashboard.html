@@ -123,15 +123,20 @@
 
         <!-- Admin/Owner Stats (hidden for Customer/Reseller) -->
         <div class="stats-grid" id="statsGridAdmin" style="display:none;">
-          <div class="stat-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-value" id="statTotalSales">0</div>
-            <div class="stat-label">ยอดขายทั้งหมด</div>
+          <div class="stat-card primary">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-value" id="statTodaySales">0</div>
+            <div class="stat-label">ยอดขายวันนี้</div>
           </div>
           <div class="stat-card success">
             <div class="stat-icon">📈</div>
             <div class="stat-value" id="statMonthSales">0</div>
             <div class="stat-label">ยอดขายเดือนนี้</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" id="statTotalSales">0</div>
+            <div class="stat-label">ยอดขายทั้งหมด</div>
           </div>
           <div class="stat-card warning">
             <div class="stat-icon">📦</div>
@@ -1106,6 +1111,7 @@
         // Admin/Owner - load full system stats
         const data = await apiGet('/api/dashboard');
         if (data.success) {
+          document.getElementById('statTodaySales').textContent = data.stats.todaySales || 0;
           document.getElementById('statTotalSales').textContent = data.stats.totalSales || 0;
           document.getElementById('statMonthSales').textContent = data.stats.monthSales || 0;
           document.getElementById('statStock').textContent = data.stats.stockCount || 0;
