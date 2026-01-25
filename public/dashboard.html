@@ -38,7 +38,7 @@
           <a href="#" class="nav-link" data-page="buy">
             <span class="icon">🛒</span> ซื้อซับเมล
           </a>
-          <a href="#" class="nav-link" data-page="search">
+          <a href="#" class="nav-link" data-page="search" id="navSearchLink">
             <span class="icon">🔍</span> ค้นหาซับเมล
           </a>
           <a href="#" class="nav-link" data-page="history">
@@ -122,10 +122,11 @@
       <div class="page" id="page-dashboard">
         <div class="page-header">
           <h2>Dashboard</h2>
-          <p>ภาพรวมระบบ ULTRA Stock</p>
+          <p id="dashboardSubtitle">ภาพรวมระบบ ULTRA Stock</p>
         </div>
 
-        <div class="stats-grid" id="statsGrid">
+        <!-- Admin/Owner Stats (hidden for Customer/Reseller) -->
+        <div class="stats-grid" id="statsGridAdmin" style="display:none;">
           <div class="stat-card">
             <div class="stat-icon">📊</div>
             <div class="stat-value" id="statTotalSales">0</div>
@@ -148,7 +149,42 @@
           </div>
         </div>
 
-        <!-- My Stats (for non-owner) -->
+        <!-- Customer/Reseller Stats (their own data only) -->
+        <div id="statsGridUser" style="display:none;">
+          <div class="stats-grid">
+            <div class="stat-card primary">
+              <div class="stat-icon">🛒</div>
+              <div class="stat-value" id="statUserTotalPurchases">0</div>
+              <div class="stat-label">ซื้อทั้งหมด</div>
+            </div>
+            <div class="stat-card success">
+              <div class="stat-icon">✅</div>
+              <div class="stat-value" id="statUserActive">0</div>
+              <div class="stat-label">ใช้งานอยู่</div>
+            </div>
+            <div class="stat-card danger">
+              <div class="stat-icon">⏰</div>
+              <div class="stat-value" id="statUserExpiring">0</div>
+              <div class="stat-label">ใกล้หมดอายุ</div>
+            </div>
+          </div>
+
+          <!-- Reseller Balance Card -->
+          <div class="card mt-20" id="resellerBalanceCard" style="display:none;">
+            <div class="card-header">
+              <h3>💳 ยอดค้างชำระ</h3>
+            </div>
+            <div class="card-body">
+              <div style="text-align:center;">
+                <div style="font-size:2.5rem;font-weight:bold;color:var(--danger);" id="statResellerBalance">฿0</div>
+                <p class="text-muted">ยอดที่ต้องชำระ</p>
+                <a href="#" class="btn btn-primary" onclick="navigateTo('submit-payment')">📤 แนบสลิปชำระ</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Stats (for Admin/Super Admin) -->
         <div class="card" id="myStatsCard" style="display:none;">
           <div class="card-header">
             <h3>📈 สถิติของคุณ</h3>
@@ -857,10 +893,13 @@
     }
 
     // Show/hide navigation based on role
-    if (user.role === 'owner' || user.role === 'super_admin') {
+    const isAdmin = user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin';
+    const isOwnerOrSuper = user.role === 'owner' || user.role === 'super_admin';
+
+    if (isOwnerOrSuper) {
       document.getElementById('navStockSection').style.display = 'block';
     }
-    if (user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin') {
+    if (isAdmin) {
       document.getElementById('navCommissionSection').style.display = 'block';
     }
     if (user.role === 'reseller') {
@@ -869,19 +908,32 @@
     if (user.role === 'customer') {
       document.getElementById('navCustomerSection').style.display = 'block';
     }
-    if (user.role === 'owner') {
-      document.getElementById('navAdminSection').style.display = 'block';
-    }
-    if (user.role === 'owner' || user.role === 'super_admin') {
-      // Show admin section for super_admin too (except some features)
+    if (isOwnerOrSuper) {
       document.getElementById('navAdminSection').style.display = 'block';
     }
 
+    // Hide search for Customer/Reseller (they can search in their own history)
+    if (user.role === 'customer' || user.role === 'reseller') {
+      document.getElementById('navSearchLink').style.display = 'none';
+    }
+
+    // Show correct dashboard stats based on role
+    if (isAdmin) {
+      document.getElementById('statsGridAdmin').style.display = 'grid';
+      document.getElementById('dashboardSubtitle').textContent = 'ภาพรวมระบบ ULTRA Stock';
+    } else {
+      document.getElementById('statsGridUser').style.display = 'block';
+      document.getElementById('dashboardSubtitle').textContent = 'ข้อมูลบัญชีของคุณ';
+      if (user.role === 'reseller') {
+        document.getElementById('resellerBalanceCard').style.display = 'block';
+      }
+    }
+
     // Show correct buy buttons based on role
-    if (user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin') {
+    if (isAdmin) {
       document.getElementById('buyBtnAdmin').style.display = 'flex';
-      // Check permission for buy without commission
-      const canBuyStock = user.role === 'owner' || user.role === 'super_admin' ||
+      // Check permission for buy without commission (only owner/super can buy stock)
+      const canBuyStock = isOwnerOrSuper ||
         (user.permissions && user.permissions.canBuyWithoutCommission);
       if (!canBuyStock) {
         document.getElementById('btnBuyStock').style.display = 'none';
@@ -1047,77 +1099,118 @@
 
     // =============== DASHBOARD ===============
     async function loadDashboard() {
-      const data = await apiGet('/api/dashboard');
-      if (data.success) {
-        document.getElementById('statTotalSales').textContent = data.stats.totalSales || 0;
-        document.getElementById('statMonthSales').textContent = data.stats.monthSales || 0;
-        document.getElementById('statStock').textContent = data.stats.stockCount || 0;
-        document.getElementById('statExpiring').textContent = data.stats.expiringCount || 0;
+      const isAdminRole = user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin';
 
-        // Show my stats for non-owner
-        if (user.role !== 'owner') {
-          document.getElementById('myStatsCard').style.display = 'block';
-          document.getElementById('statMySales').textContent = data.stats.mySales || 0;
-          document.getElementById('statMyMonthSales').textContent = data.stats.myMonthSales || 0;
-          document.getElementById('statMyCommission').textContent = '฿' + (data.stats.myCommission || 0).toLocaleString();
-        }
+      if (isAdminRole) {
+        // Admin/Owner - load full system stats
+        const data = await apiGet('/api/dashboard');
+        if (data.success) {
+          document.getElementById('statTotalSales').textContent = data.stats.totalSales || 0;
+          document.getElementById('statMonthSales').textContent = data.stats.monthSales || 0;
+          document.getElementById('statStock').textContent = data.stats.stockCount || 0;
+          document.getElementById('statExpiring').textContent = data.stats.expiringCount || 0;
 
-        // Hide commission for reseller
-        if (user.role === 'reseller') {
-          document.getElementById('myCommissionCard').style.display = 'none';
-        }
-
-        // Show main email capacity for owner/super_admin
-        if ((user.role === 'owner' || user.role === 'super_admin') && data.stats.mainEmailStats) {
-          const mes = data.stats.mainEmailStats;
-          document.getElementById('mainEmailCapacityCard').style.display = 'block';
-          document.getElementById('statTotalMain').textContent = mes.totalMainEmails;
-          document.getElementById('statFullMain').textContent = mes.fullMainEmails;
-          document.getElementById('statTotalStock').textContent = mes.totalStock || 0;
-          document.getElementById('statAvailableSlots').textContent = mes.totalAvailableSlots;
-
-          // Store for telegram report
-          window.mainEmailStats = mes;
-          window.dashboardStats = data.stats;
-
-          // Render main email list
-          const listDiv = document.getElementById('mainEmailList');
-          if (mes.mainEmails.length === 0) {
-            listDiv.innerHTML = '<div class="empty-state"><p>ยังไม่มีหัวเมล</p></div>';
-          } else {
-            listDiv.innerHTML = `
-              <div class="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>หัวเมล</th>
-                      <th>ใช้/ทั้งหมด</th>
-                      <th>สต็อก</th>
-                      <th>ขายแล้ว</th>
-                      <th>ว่าง</th>
-                      <th>สถานะ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${mes.mainEmails.map(m => `
-                      <tr>
-                        <td><code style="font-size:0.85rem;">${m.email}</code></td>
-                        <td><strong>${m.used}</strong>/${m.capacity}</td>
-                        <td><span class="badge badge-warning">${m.stock}</span></td>
-                        <td><span class="badge badge-success">${m.sold}</span></td>
-                        <td><strong>${m.available}</strong></td>
-                        <td>
-                          <span class="badge ${m.isFull ? 'badge-danger' : m.available <= 10 ? 'badge-warning' : 'badge-success'}">
-                            ${m.isFull ? 'เต็ม' : m.available <= 10 ? 'ใกล้เต็ม' : 'ปกติ'}
-                          </span>
-                        </td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `;
+          // Show my stats for admin (not owner)
+          if (user.role !== 'owner') {
+            document.getElementById('myStatsCard').style.display = 'block';
+            document.getElementById('statMySales').textContent = data.stats.mySales || 0;
+            document.getElementById('statMyMonthSales').textContent = data.stats.myMonthSales || 0;
+            document.getElementById('statMyCommission').textContent = '฿' + (data.stats.myCommission || 0).toLocaleString();
           }
+
+          // Show main email capacity for owner/super_admin
+          if ((user.role === 'owner' || user.role === 'super_admin') && data.stats.mainEmailStats) {
+            const mes = data.stats.mainEmailStats;
+            document.getElementById('mainEmailCapacityCard').style.display = 'block';
+            document.getElementById('statTotalMain').textContent = mes.totalMainEmails;
+            document.getElementById('statFullMain').textContent = mes.fullMainEmails;
+            document.getElementById('statTotalStock').textContent = mes.totalStock || 0;
+            document.getElementById('statAvailableSlots').textContent = mes.totalAvailableSlots;
+
+            // Store for telegram report
+            window.mainEmailStats = mes;
+            window.dashboardStats = data.stats;
+
+            // Render main email list
+            const listDiv = document.getElementById('mainEmailList');
+            if (mes.mainEmails.length === 0) {
+              listDiv.innerHTML = '<div class="empty-state"><p>ยังไม่มีหัวเมล</p></div>';
+            } else {
+              listDiv.innerHTML = `
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>หัวเมล</th>
+                        <th>ใช้/ทั้งหมด</th>
+                        <th>สต็อก</th>
+                        <th>ขายแล้ว</th>
+                        <th>ว่าง</th>
+                        <th>สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${mes.mainEmails.map(m => `
+                        <tr>
+                          <td><code style="font-size:0.85rem;">${m.email}</code></td>
+                          <td><strong>${m.used}</strong>/${m.capacity}</td>
+                          <td><span class="badge badge-warning">${m.stock}</span></td>
+                          <td><span class="badge badge-success">${m.sold}</span></td>
+                          <td><strong>${m.available}</strong></td>
+                          <td>
+                            <span class="badge ${m.isFull ? 'badge-danger' : m.available <= 10 ? 'badge-warning' : 'badge-success'}">
+                              ${m.isFull ? 'เต็ม' : m.available <= 10 ? 'ใกล้เต็ม' : 'ปกติ'}
+                            </span>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `;
+            }
+          }
+        }
+      } else {
+        // Customer/Reseller - load only their own purchase data
+        await loadUserDashboard();
+      }
+    }
+
+    // Load dashboard for Customer/Reseller (their own data only)
+    async function loadUserDashboard() {
+      // Load their orders to get stats
+      const data = await apiGet('/api/orders?filter=mine');
+      if (data.success) {
+        const orders = data.orders || [];
+        const now = new Date();
+
+        let totalPurchases = orders.length;
+        let activeCount = 0;
+        let expiringCount = 0;
+
+        orders.forEach(o => {
+          const expiresAt = new Date(o.expiresAt);
+          const daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+
+          if (o.status === 'active' && daysLeft > 0) {
+            activeCount++;
+            if (daysLeft <= 7) {
+              expiringCount++;
+            }
+          }
+        });
+
+        document.getElementById('statUserTotalPurchases').textContent = totalPurchases;
+        document.getElementById('statUserActive').textContent = activeCount;
+        document.getElementById('statUserExpiring').textContent = expiringCount;
+      }
+
+      // Load reseller balance if applicable
+      if (user.role === 'reseller') {
+        const balanceData = await apiGet('/api/reseller/balance');
+        if (balanceData.success) {
+          document.getElementById('statResellerBalance').textContent = '฿' + (balanceData.pending || 0).toLocaleString();
         }
       }
     }

@@ -1089,17 +1089,37 @@ function deleteAdmin(id) {
 function getPackages() {
   const sheet = getSheet(SHEETS.PACKAGES);
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  // Find column indices dynamically (in case old sheet structure)
+  const idCol = headers.indexOf('Id');
+  const nameCol = headers.indexOf('Name');
+  const daysCol = headers.indexOf('Days');
+  const activeCol = headers.indexOf('Active');
+
+  // Support both old (Price) and new (ResellerPrice, CustomerPrice) columns
+  let resellerPriceCol = headers.indexOf('ResellerPrice');
+  let customerPriceCol = headers.indexOf('CustomerPrice');
+  const oldPriceCol = headers.indexOf('Price');
+
+  // If old structure, use Price for both
+  if (resellerPriceCol === -1) resellerPriceCol = oldPriceCol;
+  if (customerPriceCol === -1) customerPriceCol = oldPriceCol;
 
   const packages = [];
 
   for (let i = 1; i < data.length; i++) {
+    const resellerPrice = resellerPriceCol >= 0 ? (parseFloat(data[i][resellerPriceCol]) || 0) : 0;
+    const customerPrice = customerPriceCol >= 0 ? (parseFloat(data[i][customerPriceCol]) || 0) : 0;
+
     packages.push({
-      id: data[i][0],
-      name: data[i][1],
-      days: data[i][2],
-      resellerPrice: data[i][3],
-      customerPrice: data[i][4],
-      active: data[i][5]
+      id: idCol >= 0 ? data[i][idCol] : data[i][0],
+      name: nameCol >= 0 ? data[i][nameCol] : data[i][1],
+      days: daysCol >= 0 ? data[i][daysCol] : data[i][2],
+      resellerPrice: resellerPrice,
+      customerPrice: customerPrice || resellerPrice, // fallback to reseller price
+      price: resellerPrice, // for backwards compatibility
+      active: activeCol >= 0 ? data[i][activeCol] : true
     });
   }
 
