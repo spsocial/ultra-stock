@@ -1055,3 +1055,46 @@ code {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* =============== FAB SUPPORT BUTTON =============== */
+
+.fab-support {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0084ff 0%, #00c6ff 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 132, 255, 0.4);
+  text-decoration: none;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.fab-support:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(0, 132, 255, 0.5);
+}
+
+.fab-support:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .fab-support {
+    bottom: 16px;
+    right: 16px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .fab-support svg {
+    width: 24px;
+    height: 24px;
+  }
+}
