@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ULTRA Stock - Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <div class="login-logo">
+        <h1>ULTRA Stock</h1>
+        <p>Admin Panel</p>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+          Login
+        </button>
+      </form>
+
+      <div id="errorMessage" style="margin-top: 15px; color: var(--danger); text-align: center; display: none;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Check if already logged in
+    const token = localStorage.getItem('ultra_token');
+    if (token) {
+      window.location.href = '/dashboard';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('loginBtn');
+      const errorDiv = document.getElementById('errorMessage');
+
+      btn.disabled = true;
+      btn.textContent = 'Logging in...';
+      errorDiv.style.display = 'none';
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          localStorage.setItem('ultra_token', data.token);
+          localStorage.setItem('ultra_user', JSON.stringify(data.user));
+          window.location.href = '/dashboard';
+        } else {
+          errorDiv.textContent = data.error || 'Login failed';
+          errorDiv.style.display = 'block';
+        }
+      } catch (error) {
+        errorDiv.textContent = 'Connection error';
+        errorDiv.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Login';
+    });
+  </script>
+</body>
+</html>

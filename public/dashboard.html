@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ULTRA Stock - Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <button class="mobile-menu-btn" onclick="toggleSidebar()">Menu</button>
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1>ULTRA Stock</h1>
+        <div class="user-info">
+          <div id="displayUsername">Loading...</div>
+          <span class="user-role" id="displayRole">-</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Main</div>
+          <a href="#" class="nav-link active" data-page="dashboard">
+            <span class="icon">📊</span> Dashboard
+          </a>
+          <a href="#" class="nav-link" data-page="buy">
+            <span class="icon">🛒</span> ซื้อซับเมล
+          </a>
+          <a href="#" class="nav-link" data-page="search">
+            <span class="icon">🔍</span> ค้นหาซับเมล
+          </a>
+          <a href="#" class="nav-link" data-page="history">
+            <span class="icon">📋</span> ประวัติการซื้อ
+          </a>
+        </div>
+
+        <div class="nav-section" id="navStockSection" style="display:none;">
+          <div class="nav-section-title">Stock Management</div>
+          <a href="#" class="nav-link" data-page="main-emails">
+            <span class="icon">📧</span> หัวเมล
+          </a>
+          <a href="#" class="nav-link" data-page="stock">
+            <span class="icon">📦</span> สต็อกซับเมล
+          </a>
+          <a href="#" class="nav-link" data-page="expiring">
+            <span class="icon">⏰</span> ใกล้หมดอายุ
+          </a>
+        </div>
+
+        <div class="nav-section" id="navCommissionSection" style="display:none;">
+          <div class="nav-section-title">Commission</div>
+          <a href="#" class="nav-link" data-page="my-commission">
+            <span class="icon">💰</span> ค่าคอมมิชชั่น
+          </a>
+        </div>
+
+        <div class="nav-section" id="navResellerSection" style="display:none;">
+          <div class="nav-section-title">Reseller</div>
+          <a href="#" class="nav-link" data-page="my-balance">
+            <span class="icon">💳</span> ยอดค้างชำระ
+          </a>
+        </div>
+
+        <div class="nav-section" id="navAdminSection" style="display:none;">
+          <div class="nav-section-title">Admin (Owner Only)</div>
+          <a href="#" class="nav-link" data-page="admins">
+            <span class="icon">👥</span> จัดการผู้ใช้
+          </a>
+          <a href="#" class="nav-link" data-page="packages">
+            <span class="icon">📦</span> แพ็กเกจ
+          </a>
+          <a href="#" class="nav-link" data-page="commissions">
+            <span class="icon">💵</span> ตั้งค่าคอม
+          </a>
+          <a href="#" class="nav-link" data-page="all-transactions">
+            <span class="icon">📑</span> รายการตัวแทน
+          </a>
+          <a href="#" class="nav-link" data-page="settings">
+            <span class="icon">⚙️</span> ตั้งค่าระบบ
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary btn-block" onclick="logout()">
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Dashboard Page -->
+      <div class="page" id="page-dashboard">
+        <div class="page-header">
+          <h2>Dashboard</h2>
+          <p>ภาพรวมระบบ ULTRA Stock</p>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" id="statTotalSales">0</div>
+            <div class="stat-label">ยอดขายทั้งหมด</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon">📈</div>
+            <div class="stat-value" id="statMonthSales">0</div>
+            <div class="stat-label">ยอดขายเดือนนี้</div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value" id="statStock">0</div>
+            <div class="stat-label">สต็อกคงเหลือ</div>
+          </div>
+          <div class="stat-card danger">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-value" id="statExpiring">0</div>
+            <div class="stat-label">ใกล้หมดอายุ (7 วัน)</div>
+          </div>
+        </div>
+
+        <!-- My Stats (for non-owner) -->
+        <div class="card" id="myStatsCard" style="display:none;">
+          <div class="card-header">
+            <h3>📈 สถิติของคุณ</h3>
+          </div>
+          <div class="card-body">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value" id="statMySales">0</div>
+                <div class="stat-label">ยอดขายของคุณ</div>
+              </div>
+              <div class="stat-card success">
+                <div class="stat-value" id="statMyMonthSales">0</div>
+                <div class="stat-label">เดือนนี้</div>
+              </div>
+              <div class="stat-card" id="myCommissionCard">
+                <div class="stat-value" id="statMyCommission">฿0</div>
+                <div class="stat-label">ค่าคอมมิชชั่น</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buy Page -->
+      <div class="page hidden" id="page-buy">
+        <div class="page-header">
+          <h2>🛒 ซื้อซับเมล</h2>
+          <p>เลือกซับเมลที่ต้องการซื้อ</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 20px;">
+          <!-- Stock List -->
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <h3>📦 สต็อกพร้อมขาย</h3>
+                <span class="badge badge-primary" id="stockCount">0 รายการ</span>
+              </div>
+              <div class="card-body">
+                <div class="stock-grid" id="stockList">
+                  <div class="loading"><div class="spinner"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buy Panel -->
+          <div class="buy-panel">
+            <h3>🛒 รายการซื้อ</h3>
+
+            <div class="text-center mb-20">
+              <div class="selected-count" id="selectedCount">0</div>
+              <div class="text-muted">รายการที่เลือก</div>
+            </div>
+
+            <div class="form-group">
+              <label>แพ็กเกจ</label>
+              <div class="package-options" id="packageOptions">
+                <!-- Dynamic -->
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>ชื่อลูกค้า / หมายเหตุ</label>
+              <input type="text" class="form-control" id="customerName" placeholder="ระบุชื่อลูกค้า">
+            </div>
+
+            <div class="buy-buttons">
+              <button class="btn btn-primary btn-block" onclick="buyDirect()">
+                🛒 ซื้อ (นับคอม)
+              </button>
+              <button class="btn btn-secondary btn-block" id="btnBuyStock" onclick="buyStock()">
+                📦 ซื้อลงสต็อก (ไม่นับคอม)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Page -->
+      <div class="page hidden" id="page-search">
+        <div class="page-header">
+          <h2>🔍 ค้นหาซับเมล</h2>
+          <p>ค้นหาข้อมูลซับเมล</p>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="search-box">
+              <input type="text" class="form-control" id="searchEmail" placeholder="กรอกซับเมลที่ต้องการค้นหา...">
+              <button class="btn btn-primary" onclick="searchSubEmail()">🔍 ค้นหา</button>
+            </div>
+
+            <div id="searchResult" style="display:none;">
+              <!-- Search result will appear here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Page -->
+      <div class="page hidden" id="page-history">
+        <div class="page-header">
+          <h2>📋 ประวัติการซื้อ</h2>
+          <p>รายการที่คุณซื้อไป</p>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ซับเมล</th>
+                    <th>ลูกค้า</th>
+                    <th>แพ็ก</th>
+                    <th>ประเภท</th>
+                    <th>หมดอายุ</th>
+                    <th>สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTable">
+                  <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Emails Page -->
+      <div class="page hidden" id="page-main-emails">
+        <div class="page-header flex-between">
+          <div>
+            <h2>📧 หัวเมล</h2>
+            <p>จัดการหัวเมลหลัก</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddMainEmailModal()">+ เพิ่มหัวเมล</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Password</th>
+                    <th>Slots</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="mainEmailsTable">
+                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stock Page -->
+      <div class="page hidden" id="page-stock">
+        <div class="page-header flex-between">
+          <div>
+            <h2>📦 สต็อกซับเมล</h2>
+            <p>เพิ่มซับเมลเข้าสต็อก</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddStockModal()">+ เพิ่มสต็อก</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ซับเมล</th>
+                    <th>Password</th>
+                    <th>หัวเมล</th>
+                    <th>สถานะ</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="stockTable">
+                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expiring Page -->
+      <div class="page hidden" id="page-expiring">
+        <div class="page-header">
+          <h2>⏰ เมลใกล้หมดอายุ</h2>
+          <p>รายการเมลที่ใกล้หมดอายุภายใน 7 วัน</p>
+        </div>
+
+        <div id="expiringContent">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- My Commission Page -->
+      <div class="page hidden" id="page-my-commission">
+        <div class="page-header">
+          <h2>💰 ค่าคอมมิชชั่น</h2>
+          <p>รายละเอียดค่าคอมมิชชั่นของคุณ</p>
+        </div>
+
+        <div class="card mb-20">
+          <div class="card-header">
+            <h3>สรุปค่าคอม</h3>
+            <select class="form-control" style="width:auto;" id="commissionMonth" onchange="loadMyCommission()">
+              <!-- Dynamic months -->
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="stat-card">
+              <div class="stat-value text-success" id="totalCommission">฿0</div>
+              <div class="stat-label">รวมค่าคอมมิชชั่น</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ซับเมล</th>
+                    <th>แพ็ก</th>
+                    <th>ค่าคอม</th>
+                    <th>วันที่</th>
+                  </tr>
+                </thead>
+                <tbody id="commissionTable">
+                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Balance Page (Reseller) -->
+      <div class="page hidden" id="page-my-balance">
+        <div class="page-header">
+          <h2>💳 ยอดค้างชำระ</h2>
+          <p>รายการซื้อและยอดค้างชำระ</p>
+        </div>
+
+        <div class="stats-grid mb-20">
+          <div class="stat-card danger">
+            <div class="stat-value" id="balancePending">฿0</div>
+            <div class="stat-label">ยอดค้างชำระ</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-value" id="balancePaid">฿0</div>
+            <div class="stat-label">ชำระแล้ว</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ซับเมล</th>
+                    <th>แพ็ก</th>
+                    <th>ราคา</th>
+                    <th>สถานะ</th>
+                    <th>วันที่</th>
+                  </tr>
+                </thead>
+                <tbody id="balanceTable">
+                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admins Page (Owner) -->
+      <div class="page hidden" id="page-admins">
+        <div class="page-header flex-between">
+          <div>
+            <h2>👥 จัดการผู้ใช้</h2>
+            <p>เพิ่ม/แก้ไข Admin และ Reseller</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddAdminModal()">+ เพิ่มผู้ใช้</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminsTable">
+                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Packages Page (Owner) -->
+      <div class="page hidden" id="page-packages">
+        <div class="page-header flex-between">
+          <div>
+            <h2>📦 แพ็กเกจ</h2>
+            <p>กำหนดแพ็กเกจและราคาขาย</p>
+          </div>
+          <button class="btn btn-primary" onclick="addPackageRow()">+ เพิ่มแพ็กเกจ</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ชื่อแพ็กเกจ</th>
+                    <th>จำนวนวัน</th>
+                    <th>ราคา (Reseller)</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="packagesTable">
+                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-20">
+              <button class="btn btn-success" onclick="savePackages()">💾 บันทึกแพ็กเกจ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Commissions Page (Owner) -->
+      <div class="page hidden" id="page-commissions">
+        <div class="page-header">
+          <h2>💵 ตั้งค่าคอมมิชชั่น</h2>
+          <p>กำหนดค่าคอมสำหรับแต่ละ Admin</p>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Admin</th>
+                    <th>Role</th>
+                    <th id="commissionPackageHeaders"><!-- Dynamic --></th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="commissionsTable">
+                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- All Transactions Page (Owner) -->
+      <div class="page hidden" id="page-all-transactions">
+        <div class="page-header">
+          <h2>📑 รายการตัวแทน</h2>
+          <p>ยอดค้างชำระของตัวแทนทั้งหมด</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Filter</h3>
+            <select class="form-control" style="width:auto;" id="filterReseller" onchange="loadAllTransactions()">
+              <option value="">ทั้งหมด</option>
+              <!-- Dynamic -->
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Reseller</th>
+                    <th>ซับเมล</th>
+                    <th>แพ็ก</th>
+                    <th>ราคา</th>
+                    <th>สถานะ</th>
+                    <th>วันที่</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="allTransactionsTable">
+                  <tr><td colspan="7" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Page (Owner) -->
+      <div class="page hidden" id="page-settings">
+        <div class="page-header">
+          <h2>⚙️ ตั้งค่าระบบ</h2>
+          <p>Telegram Notification และอื่นๆ</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📱 Telegram Notification</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Bot Token</label>
+              <input type="text" class="form-control" id="telegramBotToken" placeholder="123456789:ABCdefGHI...">
+              <small class="text-muted">สร้าง Bot ได้ที่ @BotFather</small>
+            </div>
+            <div class="form-group">
+              <label>Chat ID</label>
+              <input type="text" class="form-control" id="telegramChatId" placeholder="-1001234567890">
+              <small class="text-muted">หา Chat ID ได้จาก @userinfobot</small>
+            </div>
+            <div class="form-group">
+              <label>แจ้งเตือนล่วงหน้า (วัน)</label>
+              <input type="number" class="form-control" id="notifyDaysBefore" value="3" min="1" max="7">
+            </div>
+            <div class="flex gap-10">
+              <button class="btn btn-secondary" onclick="testTelegram()">🔔 ทดสอบ</button>
+              <button class="btn btn-success" onclick="saveSettings()">💾 บันทึก</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Modals -->
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" id="modalContent">
+      <!-- Dynamic modal content -->
+    </div>
+  </div>
+
+  <script>
+    // =============== GLOBAL STATE ===============
+    const API_URL = '';
+    const token = localStorage.getItem('ultra_token');
+    const user = JSON.parse(localStorage.getItem('ultra_user') || '{}');
+
+    let packages = [];
+    let selectedSubEmails = [];
+    let selectedPackage = null;
+    let allAdmins = [];
+
+    // =============== AUTH CHECK ===============
+    if (!token) {
+      window.location.href = '/';
+    }
+
+    // Setup UI based on role
+    document.getElementById('displayUsername').textContent = user.username || '-';
+    document.getElementById('displayRole').textContent = getRoleDisplay(user.role);
+
+    function getRoleDisplay(role) {
+      const roles = {
+        'owner': 'Owner',
+        'super_admin': 'Super Admin',
+        'admin': 'Admin',
+        'reseller': 'Reseller'
+      };
+      return roles[role] || role;
+    }
+
+    // Show/hide navigation based on role
+    if (user.role === 'owner' || user.role === 'super_admin') {
+      document.getElementById('navStockSection').style.display = 'block';
+    }
+    if (user.role === 'owner' || user.role === 'super_admin' || user.role === 'admin') {
+      document.getElementById('navCommissionSection').style.display = 'block';
+    }
+    if (user.role === 'reseller') {
+      document.getElementById('navResellerSection').style.display = 'block';
+    }
+    if (user.role === 'owner') {
+      document.getElementById('navAdminSection').style.display = 'block';
+    }
+
+    // Check permission for buy without commission
+    const canBuyStock = user.role === 'owner' || user.role === 'super_admin' ||
+      (user.permissions && user.permissions.canBuyWithoutCommission);
+    if (!canBuyStock) {
+      document.getElementById('btnBuyStock').style.display = 'none';
+    }
+
+    // =============== NAVIGATION ===============
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = link.dataset.page;
+        navigateTo(page);
+      });
+    });
+
+    function navigateTo(page) {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelector(`[data-page="${page}"]`).classList.add('active');
+
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById('page-' + page).classList.remove('hidden');
+
+      // Load page data
+      switch(page) {
+        case 'dashboard': loadDashboard(); break;
+        case 'buy': loadBuyPage(); break;
+        case 'search': break;
+        case 'history': loadHistory(); break;
+        case 'main-emails': loadMainEmails(); break;
+        case 'stock': loadStockTable(); break;
+        case 'expiring': loadExpiring(); break;
+        case 'my-commission': loadMyCommission(); break;
+        case 'my-balance': loadMyBalance(); break;
+        case 'admins': loadAdmins(); break;
+        case 'packages': loadPackages(); break;
+        case 'commissions': loadCommissions(); break;
+        case 'all-transactions': loadAllTransactions(); break;
+        case 'settings': loadSettings(); break;
+      }
+
+      // Close mobile sidebar
+      document.getElementById('sidebar').classList.remove('open');
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // =============== API HELPERS ===============
+    async function apiGet(endpoint) {
+      const response = await fetch(API_URL + endpoint, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      return response.json();
+    }
+
+    async function apiPost(endpoint, data) {
+      const response = await fetch(API_URL + endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    }
+
+    async function apiPut(endpoint, data) {
+      const response = await fetch(API_URL + endpoint, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    }
+
+    async function apiDelete(endpoint) {
+      const response = await fetch(API_URL + endpoint, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      return response.json();
+    }
+
+    // =============== TOAST ===============
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}</span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // =============== MODAL ===============
+    function showModal(title, content) {
+      document.getElementById('modalContent').innerHTML = `
+        <div class="modal-header">
+          <h3>${title}</h3>
+          <button class="modal-close" onclick="hideModal()">&times;</button>
+        </div>
+        <div class="modal-body">${content}</div>
+      `;
+      document.getElementById('modalOverlay').classList.remove('hidden');
+    }
+
+    function hideModal() {
+      document.getElementById('modalOverlay').classList.add('hidden');
+    }
+
+    // =============== DASHBOARD ===============
+    async function loadDashboard() {
+      const data = await apiGet('/api/dashboard');
+      if (data.success) {
+        document.getElementById('statTotalSales').textContent = data.stats.totalSales || 0;
+        document.getElementById('statMonthSales').textContent = data.stats.monthSales || 0;
+        document.getElementById('statStock').textContent = data.stats.stockCount || 0;
+        document.getElementById('statExpiring').textContent = data.stats.expiringCount || 0;
+
+        // Show my stats for non-owner
+        if (user.role !== 'owner') {
+          document.getElementById('myStatsCard').style.display = 'block';
+          document.getElementById('statMySales').textContent = data.stats.mySales || 0;
+          document.getElementById('statMyMonthSales').textContent = data.stats.myMonthSales || 0;
+          document.getElementById('statMyCommission').textContent = '฿' + (data.stats.myCommission || 0).toLocaleString();
+        }
+
+        // Hide commission for reseller
+        if (user.role === 'reseller') {
+          document.getElementById('myCommissionCard').style.display = 'none';
+        }
+      }
+    }
+
+    // =============== BUY PAGE ===============
+    async function loadBuyPage() {
+      // Load packages
+      const pkgData = await apiGet('/api/packages');
+      if (pkgData.success) {
+        packages = pkgData.packages.filter(p => p.active);
+        renderPackageOptions();
+      }
+
+      // Load stock
+      const stockData = await apiGet('/api/sub-emails?status=stock');
+      if (stockData.success) {
+        document.getElementById('stockCount').textContent = stockData.emails.length + ' รายการ';
+        renderStockList(stockData.emails);
+      }
+    }
+
+    function renderPackageOptions() {
+      const container = document.getElementById('packageOptions');
+      container.innerHTML = packages.map(pkg => `
+        <div class="package-option ${selectedPackage === pkg.days ? 'selected' : ''}"
+             onclick="selectPackage(${pkg.days})">
+          <div class="package-days">${pkg.days}</div>
+          <div class="package-name">${pkg.name}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectPackage(days) {
+      selectedPackage = days;
+      renderPackageOptions();
+    }
+
+    function renderStockList(emails) {
+      const container = document.getElementById('stockList');
+      if (emails.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📦</div><h3>ไม่มีสต็อก</h3></div>';
+        return;
+      }
+
+      container.innerHTML = emails.map(email => `
+        <div class="stock-item ${selectedSubEmails.includes(email.id) ? 'selected' : ''}"
+             onclick="toggleStockItem('${email.id}')">
+          <div class="stock-item-header">
+            <input type="checkbox" ${selectedSubEmails.includes(email.id) ? 'checked' : ''}
+                   onclick="event.stopPropagation(); toggleStockItem('${email.id}')">
+            <span class="stock-email">${email.email}</span>
+          </div>
+          <div class="stock-password">Password: ${email.password}</div>
+          <div class="stock-main-email">หัวเมล: ${email.mainEmail}</div>
+        </div>
+      `).join('');
+    }
+
+    function toggleStockItem(id) {
+      const index = selectedSubEmails.indexOf(id);
+      if (index > -1) {
+        selectedSubEmails.splice(index, 1);
+      } else {
+        selectedSubEmails.push(id);
+      }
+      document.getElementById('selectedCount').textContent = selectedSubEmails.length;
+      loadBuyPage(); // Re-render
+    }
+
+    async function buyDirect() {
+      await doBuy('direct');
+    }
+
+    async function buyStock() {
+      await doBuy('stock');
+    }
+
+    async function doBuy(saleType) {
+      if (selectedSubEmails.length === 0) {
+        showToast('กรุณาเลือกซับเมล', 'warning');
+        return;
+      }
+      if (!selectedPackage) {
+        showToast('กรุณาเลือกแพ็กเกจ', 'warning');
+        return;
+      }
+
+      const customerName = document.getElementById('customerName').value;
+
+      const data = await apiPost('/api/orders', {
+        subEmailIds: selectedSubEmails,
+        packageDays: selectedPackage,
+        customerName,
+        saleType
+      });
+
+      if (data.success) {
+        showToast(data.message, 'success');
+
+        // Show result modal
+        const resultHtml = `
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:3rem;">✅</div>
+            <h3>ซื้อสำเร็จ ${data.orders.length} รายการ</h3>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Email</th><th>Password</th><th>หมดอายุ</th></tr></thead>
+              <tbody>
+                ${data.orders.map(o => `
+                  <tr>
+                    <td><code>${o.email}</code></td>
+                    <td>${o.password}</td>
+                    <td>${formatDate(o.expiresAt)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-20 text-center">
+            <button class="btn btn-secondary" onclick="copyOrders(${JSON.stringify(data.orders).replace(/"/g, '&quot;')})">📋 Copy ทั้งหมด</button>
+          </div>
+        `;
+        showModal('🎉 ซื้อสำเร็จ', resultHtml);
+
+        // Reset
+        selectedSubEmails = [];
+        document.getElementById('selectedCount').textContent = '0';
+        document.getElementById('customerName').value = '';
+        loadBuyPage();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    function copyOrders(orders) {
+      const text = orders.map(o => `${o.email}\n${o.password}`).join('\n\n');
+      navigator.clipboard.writeText(text);
+      showToast('Copied!', 'success');
+    }
+
+    // =============== SEARCH ===============
+    async function searchSubEmail() {
+      const email = document.getElementById('searchEmail').value;
+      if (!email) {
+        showToast('กรุณากรอกซับเมล', 'warning');
+        return;
+      }
+
+      const data = await apiGet('/api/sub-emails/search?email=' + encodeURIComponent(email));
+      const resultDiv = document.getElementById('searchResult');
+
+      if (data.success) {
+        const r = data.result;
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+          <div class="card mt-20">
+            <div class="card-header">
+              <h3>📧 ${r.email}</h3>
+              <span class="badge ${r.status === 'sold' ? 'badge-success' : 'badge-warning'}">${r.status}</span>
+            </div>
+            <div class="card-body">
+              <p><strong>Password:</strong> ${r.password}</p>
+              <hr style="margin:15px 0;border-color:var(--border);">
+              <p><strong>หัวเมล:</strong> ${r.mainEmail ? r.mainEmail.email : '-'}</p>
+              ${r.mainEmail && r.mainEmail.password ? `<p><strong>พาสหัวเมล:</strong> <code>${r.mainEmail.password}</code></p>` : ''}
+              ${r.order ? `
+                <hr style="margin:15px 0;border-color:var(--border);">
+                <p><strong>ลูกค้า:</strong> ${r.order.customerName || '-'}</p>
+                <p><strong>แพ็กเกจ:</strong> ${r.order.packageDays} วัน</p>
+                <p><strong>ขายโดย:</strong> ${r.order.soldBy}</p>
+                <p><strong>หมดอายุ:</strong> ${formatDate(r.order.expiresAt)}</p>
+                <p><strong>สถานะ:</strong> <span class="badge ${r.order.status === 'expired' ? 'badge-danger' : 'badge-success'}">${r.order.status}</span></p>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `<div class="empty-state mt-20"><div class="icon">🔍</div><h3>${data.error}</h3></div>`;
+      }
+    }
+
+    // =============== HISTORY ===============
+    async function loadHistory() {
+      const data = await apiGet('/api/orders?filter=mine');
+      const tbody = document.getElementById('historyTable');
+
+      if (data.success && data.orders.length > 0) {
+        tbody.innerHTML = data.orders.map(o => `
+          <tr>
+            <td><code>${o.subEmail}</code></td>
+            <td>${o.customerName || '-'}</td>
+            <td>${o.packageDays} วัน</td>
+            <td><span class="badge ${o.saleType === 'direct' ? 'badge-success' : 'badge-secondary'}">${o.saleType === 'direct' ? 'ขายตรง' : 'ลงสต็อก'}</span></td>
+            <td>${formatDate(o.expiresAt)}</td>
+            <td><span class="badge ${o.status === 'expired' ? 'badge-danger' : 'badge-success'}">${o.status}</span></td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ยังไม่มีประวัติ</td></tr>';
+      }
+    }
+
+    // =============== MAIN EMAILS ===============
+    async function loadMainEmails() {
+      const data = await apiGet('/api/main-emails');
+      const tbody = document.getElementById('mainEmailsTable');
+
+      if (data.success && data.emails.length > 0) {
+        tbody.innerHTML = data.emails.map(e => `
+          <tr>
+            <td><code>${e.email}</code></td>
+            <td>${e.password}</td>
+            <td>${e.usedSlots}/${e.capacity}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="editMainEmail('${e.id}', '${e.email}', '${e.password}')">แก้ไข</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteMainEmail('${e.id}')">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีหัวเมล</td></tr>';
+      }
+    }
+
+    function showAddMainEmailModal() {
+      showModal('เพิ่มหัวเมล', `
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="newMainEmail" placeholder="main@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" class="form-control" id="newMainPassword" placeholder="password">
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="addMainEmail()">เพิ่ม</button>
+        </div>
+      `);
+    }
+
+    async function addMainEmail() {
+      const email = document.getElementById('newMainEmail').value;
+      const password = document.getElementById('newMainPassword').value;
+
+      if (!email || !password) {
+        showToast('กรุณากรอกข้อมูลให้ครบ', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/main-emails', { email, password });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadMainEmails();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    function editMainEmail(id, email, password) {
+      showModal('แก้ไขหัวเมล', `
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" id="editMainEmail" value="${email}">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" class="form-control" id="editMainPassword" value="${password}">
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="updateMainEmail('${id}')">บันทึก</button>
+        </div>
+      `);
+    }
+
+    async function updateMainEmail(id) {
+      const email = document.getElementById('editMainEmail').value;
+      const password = document.getElementById('editMainPassword').value;
+
+      const data = await apiPut('/api/main-emails/' + id, { email, password });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadMainEmails();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function deleteMainEmail(id) {
+      if (!confirm('ยืนยันลบหัวเมลนี้?')) return;
+
+      const data = await apiDelete('/api/main-emails/' + id);
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadMainEmails();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== STOCK TABLE ===============
+    async function loadStockTable() {
+      const data = await apiGet('/api/sub-emails?status=stock');
+      const tbody = document.getElementById('stockTable');
+
+      if (data.success && data.emails.length > 0) {
+        tbody.innerHTML = data.emails.map(e => `
+          <tr>
+            <td><code>${e.email}</code></td>
+            <td>${e.password}</td>
+            <td>${e.mainEmail}</td>
+            <td><span class="badge badge-warning">${e.status}</span></td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteSubEmail('${e.id}')">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีสต็อก</td></tr>';
+      }
+    }
+
+    async function showAddStockModal() {
+      // Load main emails
+      const mainData = await apiGet('/api/main-emails');
+
+      showModal('เพิ่มสต็อกซับเมล', `
+        <div class="form-group">
+          <label>เลือกหัวเมล</label>
+          <select class="form-control" id="stockMainEmailId">
+            ${mainData.emails.map(e => `<option value="${e.id}">${e.email} (${e.usedSlots}/${e.capacity})</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ซับเมล (email:password ต่อบรรทัด)</label>
+          <textarea class="form-control" id="stockEmails" rows="6" placeholder="sub1@example.com:password1
+sub2@example.com:password2"></textarea>
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="addStock()">เพิ่มสต็อก</button>
+        </div>
+      `);
+    }
+
+    async function addStock() {
+      const mainEmailId = document.getElementById('stockMainEmailId').value;
+      const emailsText = document.getElementById('stockEmails').value;
+
+      const emails = emailsText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.includes(':'))
+        .map(line => {
+          const [email, password] = line.split(':');
+          return { email: email.trim(), password: password.trim() };
+        });
+
+      if (emails.length === 0) {
+        showToast('กรุณากรอกซับเมล', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/sub-emails', { mainEmailId, emails });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadStockTable();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function deleteSubEmail(id) {
+      if (!confirm('ยืนยันลบซับเมลนี้?')) return;
+
+      const data = await apiDelete('/api/sub-emails/' + id);
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadStockTable();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== EXPIRING ===============
+    async function loadExpiring() {
+      const data = await apiGet('/api/expiring?days=7');
+      const container = document.getElementById('expiringContent');
+
+      if (data.success) {
+        const { today, soon, upcoming } = data.expiring;
+
+        if (today.length === 0 && soon.length === 0 && upcoming.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">✅</div><h3>ไม่มีเมลใกล้หมดอายุ</h3></div>';
+          return;
+        }
+
+        container.innerHTML = `
+          ${renderExpirySection('today', 'หมดวันนี้', today)}
+          ${renderExpirySection('soon', 'หมดใน 1-3 วัน', soon)}
+          ${renderExpirySection('upcoming', 'หมดใน 4-7 วัน', upcoming)}
+        `;
+      }
+    }
+
+    function renderExpirySection(type, title, items) {
+      if (items.length === 0) return '';
+
+      return `
+        <div class="expiry-section">
+          <div class="expiry-section-header ${type}">
+            <span>${type === 'today' ? '🔴' : type === 'soon' ? '🟠' : '🟡'}</span>
+            <h4>${title}</h4>
+            <span class="expiry-count">${items.length}</span>
+          </div>
+          ${items.map(item => `
+            <div class="expiry-card">
+              <div class="expiry-card-header">
+                <span class="expiry-email">${item.subEmail}</span>
+                <span class="expiry-${type}">${item.daysUntil <= 0 ? 'หมดแล้ว!' : item.daysUntil + ' วัน'}</span>
+              </div>
+              <div class="expiry-card-body">
+                <div>ลูกค้า: ${item.customerName || '-'}</div>
+                <div>แพ็ก: ${item.packageDays} วัน</div>
+                <div>ขายโดย: ${item.soldBy}</div>
+                <div>หมดอายุ: ${formatDate(item.expiresAt)}</div>
+                ${item.mainEmail ? `<div>หัวเมล: ${item.mainEmail.email}</div>` : ''}
+                ${item.mainEmail && item.mainEmail.password ? `<div>พาสหัวเมล: <code>${item.mainEmail.password}</code></div>` : ''}
+              </div>
+              <div class="expiry-card-actions">
+                <button class="btn btn-sm btn-warning" onclick="showExtendModal('${item.id}')">➕ ต่ออายุ</button>
+                <button class="btn btn-sm btn-danger" onclick="markExpired('${item.id}')">🗑️ ลบ (หมดแล้ว)</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function showExtendModal(orderId) {
+      showModal('ต่ออายุ', `
+        <div class="form-group">
+          <label>ต่อเพิ่ม (วัน)</label>
+          <input type="number" class="form-control" id="extendDays" value="30" min="1">
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-success" onclick="extendOrder('${orderId}')">ต่ออายุ</button>
+        </div>
+      `);
+    }
+
+    async function extendOrder(orderId) {
+      const days = parseInt(document.getElementById('extendDays').value);
+      if (!days || days < 1) {
+        showToast('กรุณากรอกจำนวนวัน', 'warning');
+        return;
+      }
+
+      const data = await apiPut('/api/orders/' + orderId + '/extend', { days });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadExpiring();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function markExpired(orderId) {
+      if (!confirm('ยืนยันลบเมลนี้? (เมลจะถูกลบออกจากระบบ)')) return;
+
+      const data = await apiPut('/api/orders/' + orderId + '/expire');
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadExpiring();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== MY COMMISSION ===============
+    function loadMyCommission() {
+      // Setup month selector
+      const select = document.getElementById('commissionMonth');
+      if (select.options.length === 0) {
+        const now = new Date();
+        for (let i = 0; i < 6; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const value = d.toISOString().substring(0, 7);
+          const label = d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
+          select.innerHTML += `<option value="${value}">${label}</option>`;
+        }
+      }
+
+      loadCommissionData();
+    }
+
+    async function loadCommissionData() {
+      const month = document.getElementById('commissionMonth').value;
+      const data = await apiGet('/api/commission-log?month=' + month);
+
+      if (data.success) {
+        document.getElementById('totalCommission').textContent = '฿' + data.total.toLocaleString();
+
+        const tbody = document.getElementById('commissionTable');
+        if (data.logs.length > 0) {
+          tbody.innerHTML = data.logs.map(log => `
+            <tr>
+              <td><code>${log.subEmail}</code></td>
+              <td>${log.packageDays} วัน</td>
+              <td class="text-success">฿${log.amount.toLocaleString()}</td>
+              <td>${formatDate(log.createdAt)}</td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีค่าคอม</td></tr>';
+        }
+      }
+    }
+
+    // =============== MY BALANCE (RESELLER) ===============
+    async function loadMyBalance() {
+      const balanceData = await apiGet('/api/reseller/balance');
+      if (balanceData.success) {
+        document.getElementById('balancePending').textContent = '฿' + balanceData.pending.toLocaleString();
+        document.getElementById('balancePaid').textContent = '฿' + balanceData.paid.toLocaleString();
+      }
+
+      const txnData = await apiGet('/api/reseller/transactions');
+      const tbody = document.getElementById('balanceTable');
+
+      if (txnData.success && txnData.transactions.length > 0) {
+        tbody.innerHTML = txnData.transactions.map(t => `
+          <tr>
+            <td><code>${t.subEmail}</code></td>
+            <td>${t.packageDays} วัน</td>
+            <td>฿${t.amount.toLocaleString()}</td>
+            <td><span class="badge ${t.status === 'paid' ? 'badge-success' : 'badge-danger'}">${t.status === 'paid' ? 'ชำระแล้ว' : 'ค้างชำระ'}</span></td>
+            <td>${formatDate(t.createdAt)}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีรายการ</td></tr>';
+      }
+    }
+
+    // =============== ADMINS (OWNER) ===============
+    async function loadAdmins() {
+      const data = await apiGet('/api/admins');
+      const tbody = document.getElementById('adminsTable');
+      allAdmins = data.admins || [];
+
+      if (data.success && data.admins.length > 0) {
+        tbody.innerHTML = data.admins.map(a => `
+          <tr>
+            <td>${a.username}</td>
+            <td><span class="badge badge-primary">${getRoleDisplay(a.role)}</span></td>
+            <td>${formatPermissions(a.permissions)}</td>
+            <td>
+              ${a.role !== 'owner' ? `
+                <button class="btn btn-sm btn-secondary" onclick='editAdmin(${JSON.stringify(a).replace(/'/g, "\\'")})'>แก้ไข</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteAdmin('${a.id}')">ลบ</button>
+              ` : '<span class="text-muted">-</span>'}
+            </td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ไม่มีข้อมูล</td></tr>';
+      }
+    }
+
+    function formatPermissions(perms) {
+      if (!perms || Object.keys(perms).length === 0) return '-';
+      const labels = {
+        canBuyWithoutCommission: 'ซื้อไม่นับคอม',
+        canViewMainPassword: 'ดูพาสหัวเมล'
+      };
+      return Object.keys(perms)
+        .filter(k => perms[k])
+        .map(k => `<span class="badge badge-secondary">${labels[k] || k}</span>`)
+        .join(' ');
+    }
+
+    function showAddAdminModal() {
+      showModal('เพิ่มผู้ใช้', `
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" id="newAdminUsername" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" class="form-control" id="newAdminPassword" placeholder="password">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select class="form-control" id="newAdminRole">
+            <option value="super_admin">Super Admin</option>
+            <option value="admin">Admin</option>
+            <option value="reseller">Reseller</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Permissions</label>
+          <div class="permissions-grid">
+            <label class="permission-item">
+              <input type="checkbox" id="permBuyStock"> ซื้อไม่นับคอม
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="addAdmin()">เพิ่ม</button>
+        </div>
+      `);
+    }
+
+    async function addAdmin() {
+      const username = document.getElementById('newAdminUsername').value;
+      const password = document.getElementById('newAdminPassword').value;
+      const role = document.getElementById('newAdminRole').value;
+      const permissions = {
+        canBuyWithoutCommission: document.getElementById('permBuyStock').checked
+      };
+
+      if (!username || !password) {
+        showToast('กรุณากรอกข้อมูลให้ครบ', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/admins', { username, password, role, permissions });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadAdmins();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    function editAdmin(admin) {
+      showModal('แก้ไขผู้ใช้', `
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" class="form-control" id="editAdminUsername" value="${admin.username}">
+        </div>
+        <div class="form-group">
+          <label>Password (เว้นว่างถ้าไม่เปลี่ยน)</label>
+          <input type="text" class="form-control" id="editAdminPassword" placeholder="new password">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select class="form-control" id="editAdminRole">
+            <option value="super_admin" ${admin.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+            <option value="admin" ${admin.role === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="reseller" ${admin.role === 'reseller' ? 'selected' : ''}>Reseller</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Permissions</label>
+          <div class="permissions-grid">
+            <label class="permission-item">
+              <input type="checkbox" id="editPermBuyStock" ${admin.permissions?.canBuyWithoutCommission ? 'checked' : ''}> ซื้อไม่นับคอม
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="updateAdmin('${admin.id}')">บันทึก</button>
+        </div>
+      `);
+    }
+
+    async function updateAdmin(id) {
+      const username = document.getElementById('editAdminUsername').value;
+      const password = document.getElementById('editAdminPassword').value;
+      const role = document.getElementById('editAdminRole').value;
+      const permissions = {
+        canBuyWithoutCommission: document.getElementById('editPermBuyStock').checked
+      };
+
+      const data = await apiPut('/api/admins/' + id, {
+        username,
+        password: password || undefined,
+        role,
+        permissions
+      });
+
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadAdmins();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function deleteAdmin(id) {
+      if (!confirm('ยืนยันลบผู้ใช้นี้?')) return;
+
+      const data = await apiDelete('/api/admins/' + id);
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadAdmins();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== PACKAGES (OWNER) ===============
+    let packagesData = [];
+
+    async function loadPackages() {
+      const data = await apiGet('/api/packages');
+      packagesData = data.packages || [];
+      renderPackagesTable();
+    }
+
+    function renderPackagesTable() {
+      const tbody = document.getElementById('packagesTable');
+      tbody.innerHTML = packagesData.map((pkg, i) => `
+        <tr>
+          <td><input type="text" class="form-control" value="${pkg.name}" onchange="updatePackageField(${i}, 'name', this.value)"></td>
+          <td><input type="number" class="form-control" value="${pkg.days}" onchange="updatePackageField(${i}, 'days', parseInt(this.value))"></td>
+          <td><input type="number" class="form-control" value="${pkg.price}" onchange="updatePackageField(${i}, 'price', parseInt(this.value))"></td>
+          <td><input type="checkbox" ${pkg.active ? 'checked' : ''} onchange="updatePackageField(${i}, 'active', this.checked)"></td>
+          <td><button class="btn btn-sm btn-danger" onclick="removePackageRow(${i})">ลบ</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function updatePackageField(index, field, value) {
+      packagesData[index][field] = value;
+    }
+
+    function addPackageRow() {
+      packagesData.push({ name: '', days: 30, price: 500, active: true });
+      renderPackagesTable();
+    }
+
+    function removePackageRow(index) {
+      packagesData.splice(index, 1);
+      renderPackagesTable();
+    }
+
+    async function savePackages() {
+      const data = await apiPost('/api/packages', { packages: packagesData });
+      if (data.success) {
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== COMMISSIONS (OWNER) ===============
+    async function loadCommissions() {
+      const data = await apiGet('/api/commissions');
+
+      if (data.success) {
+        // Header
+        const headerTh = document.getElementById('commissionPackageHeaders');
+        headerTh.outerHTML = data.packages.map(p => `<th>${p.name} (${p.days}วัน)</th>`).join('');
+
+        // Body
+        const tbody = document.getElementById('commissionsTable');
+        tbody.innerHTML = data.admins.map(admin => `
+          <tr>
+            <td>${admin.username}</td>
+            <td><span class="badge badge-primary">${getRoleDisplay(admin.role)}</span></td>
+            ${data.packages.map(p => `
+              <td>
+                <input type="number" class="commission-input"
+                       value="${admin.commissions[p.days] || 0}"
+                       data-admin="${admin.id}" data-days="${p.days}"
+                       onchange="markCommissionChanged(this)">
+              </td>
+            `).join('')}
+            <td>
+              <button class="btn btn-sm btn-success" onclick="saveAdminCommission('${admin.id}')">บันทึก</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function markCommissionChanged(input) {
+      input.style.borderColor = 'var(--warning)';
+    }
+
+    async function saveAdminCommission(adminId) {
+      const inputs = document.querySelectorAll(`input[data-admin="${adminId}"]`);
+      const commissions = {};
+      inputs.forEach(input => {
+        commissions[input.dataset.days] = parseInt(input.value) || 0;
+        input.style.borderColor = '';
+      });
+
+      const data = await apiPut('/api/commissions/' + adminId, { commissions });
+      if (data.success) {
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== ALL TRANSACTIONS (OWNER) ===============
+    async function loadAllTransactions() {
+      const filter = document.getElementById('filterReseller').value;
+      const data = await apiGet('/api/reseller/transactions');
+
+      // Populate filter dropdown
+      if (data.success) {
+        const resellers = [...new Set(data.transactions.map(t => t.resellerName))];
+        const filterSelect = document.getElementById('filterReseller');
+        if (filterSelect.options.length <= 1) {
+          resellers.forEach(r => {
+            filterSelect.innerHTML += `<option value="${r}">${r}</option>`;
+          });
+        }
+
+        let transactions = data.transactions;
+        if (filter) {
+          transactions = transactions.filter(t => t.resellerName === filter);
+        }
+
+        const tbody = document.getElementById('allTransactionsTable');
+        if (transactions.length > 0) {
+          tbody.innerHTML = transactions.map(t => `
+            <tr>
+              <td>${t.resellerName}</td>
+              <td><code>${t.subEmail}</code></td>
+              <td>${t.packageDays} วัน</td>
+              <td>฿${t.amount.toLocaleString()}</td>
+              <td><span class="badge ${t.status === 'paid' ? 'badge-success' : 'badge-danger'}">${t.status === 'paid' ? 'ชำระแล้ว' : 'ค้างชำระ'}</span></td>
+              <td>${formatDate(t.createdAt)}</td>
+              <td>
+                ${t.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="markTxnPaid('${t.id}')">ชำระแล้ว</button>` : '-'}
+              </td>
+            </tr>
+          `).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่มีรายการ</td></tr>';
+        }
+      }
+    }
+
+    async function markTxnPaid(id) {
+      if (!confirm('ยืนยันว่าชำระเงินแล้ว?')) return;
+
+      const data = await apiPut('/api/reseller/transactions/' + id + '/paid');
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadAllTransactions();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== SETTINGS (OWNER) ===============
+    async function loadSettings() {
+      const data = await apiGet('/api/settings');
+      if (data.success) {
+        document.getElementById('telegramBotToken').value = data.settings.telegramBotToken || '';
+        document.getElementById('telegramChatId').value = data.settings.telegramChatId || '';
+        document.getElementById('notifyDaysBefore').value = data.settings.notifyDaysBefore || 3;
+      }
+    }
+
+    async function testTelegram() {
+      const botToken = document.getElementById('telegramBotToken').value;
+      const chatId = document.getElementById('telegramChatId').value;
+
+      if (!botToken || !chatId) {
+        showToast('กรุณากรอก Bot Token และ Chat ID', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/telegram/test', { botToken, chatId });
+      if (data.success) {
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function saveSettings() {
+      const data = await apiPut('/api/settings', {
+        telegramBotToken: document.getElementById('telegramBotToken').value,
+        telegramChatId: document.getElementById('telegramChatId').value,
+        notifyDaysBefore: document.getElementById('notifyDaysBefore').value
+      });
+
+      if (data.success) {
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== HELPERS ===============
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function logout() {
+      localStorage.removeItem('ultra_token');
+      localStorage.removeItem('ultra_user');
+      window.location.href = '/';
+    }
+
+    // =============== INIT ===============
+    loadDashboard();
+  </script>
+</body>
+</html>
