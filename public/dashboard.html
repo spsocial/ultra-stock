@@ -652,13 +652,14 @@
                   <tr>
                     <th>ชื่อแพ็กเกจ</th>
                     <th>จำนวนวัน</th>
-                    <th>ราคา (Reseller)</th>
+                    <th>ราคา Reseller</th>
+                    <th>ราคา Customer</th>
                     <th>Active</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="packagesTable">
-                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                  <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2475,8 +2476,9 @@ sub2@example.com:password2"></textarea>
       tbody.innerHTML = packagesData.map((pkg, i) => `
         <tr>
           <td><input type="text" class="form-control" value="${pkg.name}" onchange="updatePackageField(${i}, 'name', this.value)"></td>
-          <td><input type="number" class="form-control" value="${pkg.days}" onchange="updatePackageField(${i}, 'days', parseInt(this.value))"></td>
-          <td><input type="number" class="form-control" value="${pkg.price}" onchange="updatePackageField(${i}, 'price', parseInt(this.value))"></td>
+          <td><input type="number" class="form-control" value="${pkg.days}" onchange="updatePackageField(${i}, 'days', parseInt(this.value))" style="width:80px;"></td>
+          <td><input type="number" class="form-control" value="${pkg.resellerPrice || pkg.price || 0}" onchange="updatePackageField(${i}, 'resellerPrice', parseInt(this.value))" style="width:100px;"></td>
+          <td><input type="number" class="form-control" value="${pkg.customerPrice || pkg.price || 0}" onchange="updatePackageField(${i}, 'customerPrice', parseInt(this.value))" style="width:100px;"></td>
           <td><input type="checkbox" ${pkg.active ? 'checked' : ''} onchange="updatePackageField(${i}, 'active', this.checked)"></td>
           <td><button class="btn btn-sm btn-danger" onclick="removePackageRow(${i})">ลบ</button></td>
         </tr>
@@ -2485,10 +2487,14 @@ sub2@example.com:password2"></textarea>
 
     function updatePackageField(index, field, value) {
       packagesData[index][field] = value;
+      // Sync resellerPrice to price for backwards compatibility
+      if (field === 'resellerPrice') {
+        packagesData[index].price = value;
+      }
     }
 
     function addPackageRow() {
-      packagesData.push({ name: '', days: 30, price: 500, active: true });
+      packagesData.push({ name: '', days: 30, resellerPrice: 500, customerPrice: 799, active: true });
       renderPackagesTable();
     }
 
