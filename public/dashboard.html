@@ -2662,7 +2662,11 @@ sub2@example.com:password2"></textarea>
       if (!dateStr) return '-';
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return '-';
-      return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+      const dateOptions = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' };
+      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' };
+      const datePart = d.toLocaleDateString('th-TH', dateOptions);
+      const timePart = d.toLocaleTimeString('th-TH', timeOptions);
+      return `${datePart} ${timePart} น.`;
     }
 
     function logout() {
