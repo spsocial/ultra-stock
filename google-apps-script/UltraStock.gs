@@ -190,6 +190,7 @@ function doPost(e) {
       // Commission Payment System
       case 'getAdminCommissionStats': result = getAdminCommissionStats(data); break;
       case 'getAllAdminsCommissionStats': result = getAllAdminsCommissionStats(data); break;
+      case 'getCommissionLogAll': result = getCommissionLogAll(data); break;
       case 'payCommissionToAdmin': result = payCommissionToAdmin(data); break;
       case 'getCommissionPayments': result = getCommissionPayments(data); break;
 
@@ -2320,6 +2321,59 @@ function getAllAdminsCommissionStats(data) {
     month: targetMonth,
     admins,
     totals
+  };
+}
+
+// Get All Commission Logs (for Owner to see raw data)
+function getCommissionLogAll(data) {
+  const { month } = data;
+  const targetMonth = month || new Date().toISOString().substring(0, 7);
+
+  const sheet = getSheet(SHEETS.COMMISSION_LOG);
+  const sheetData = sheet.getDataRange().getValues();
+  const headers = sheetData[0];
+
+  const idCol = headers.indexOf('Id');
+  const adminIdCol = headers.indexOf('AdminId');
+  const adminNameCol = headers.indexOf('AdminName');
+  const orderIdCol = headers.indexOf('OrderId');
+  const subEmailCol = headers.indexOf('SubEmail');
+  const packageDaysCol = headers.indexOf('PackageDays');
+  const amountCol = headers.indexOf('Amount');
+  const createdAtCol = headers.indexOf('CreatedAt');
+  const typeCol = headers.indexOf('Type');
+
+  const logs = [];
+
+  for (let i = 1; i < sheetData.length; i++) {
+    const createdAt = sheetData[i][createdAtCol];
+    if (!createdAt) continue;
+
+    // Filter by month
+    const logMonth = createdAt.substring(0, 7);
+    if (logMonth !== targetMonth) continue;
+
+    logs.push({
+      id: sheetData[i][idCol],
+      adminId: sheetData[i][adminIdCol],
+      adminName: sheetData[i][adminNameCol],
+      orderId: sheetData[i][orderIdCol],
+      subEmail: sheetData[i][subEmailCol],
+      packageDays: sheetData[i][packageDaysCol],
+      amount: parseFloat(sheetData[i][amountCol]) || 0,
+      createdAt: createdAt,
+      type: sheetData[i][typeCol] || 'sale'
+    });
+  }
+
+  // Sort by date descending
+  logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return {
+    success: true,
+    month: targetMonth,
+    logs,
+    total: logs.reduce((sum, l) => sum + l.amount, 0)
   };
 }
 

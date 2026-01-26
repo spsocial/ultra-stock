@@ -887,6 +887,15 @@ app.get('/api/all-admins-commission', authenticateToken, requireRole('owner'), a
   res.json(result);
 });
 
+// Get Commission Log (Owner only)
+app.get('/api/commission-log', authenticateToken, requireRole('owner'), async (req, res) => {
+  const result = await callGoogleScript('getCommissionLogAll', {
+    month: req.query.month
+  });
+
+  res.json(result);
+});
+
 // Pay Commission to Admin (Owner only)
 app.post('/api/pay-commission', authenticateToken, requireRole('owner'), async (req, res) => {
   const { adminId, amount, note } = req.body;

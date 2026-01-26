@@ -556,6 +556,33 @@
             </div>
           </div>
         </div>
+
+        <!-- Commission Log Details -->
+        <div class="card mt-20">
+          <div class="card-header">
+            <h3>📋 รายละเอียด CommissionLog</h3>
+            <button class="btn btn-sm btn-secondary" onclick="loadCommissionLog()">🔄 รีเฟรช</button>
+          </div>
+          <div class="card-body">
+            <div class="table-container" style="max-height:400px;overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>วันที่</th>
+                    <th>Admin</th>
+                    <th>ซับเมล</th>
+                    <th>แพ็ก</th>
+                    <th>ค่าคอม</th>
+                    <th>ประเภท</th>
+                  </tr>
+                </thead>
+                <tbody id="commissionLogTable">
+                  <tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Reseller: Balance & Payment Page -->
@@ -2219,6 +2246,32 @@ sub2@example.com:password2"></textarea>
         } else {
           container.innerHTML = '<div class="empty-state"><div class="icon">👥</div><h3>ยังไม่มี Admin/Super Admin</h3></div>';
         }
+      }
+
+      // Also load commission log
+      loadCommissionLog();
+    }
+
+    async function loadCommissionLog() {
+      const month = document.getElementById('allCommissionMonth').value;
+      const tbody = document.getElementById('commissionLogTable');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr>';
+
+      const data = await apiGet(`/api/commission-log?month=${month}`);
+
+      if (data.success && data.logs && data.logs.length > 0) {
+        tbody.innerHTML = data.logs.map(log => `
+          <tr>
+            <td>${formatDate(log.createdAt)}</td>
+            <td>${log.adminName}</td>
+            <td style="font-size:0.85rem;">${log.subEmail}</td>
+            <td>${log.packageDays} วัน</td>
+            <td class="text-success">฿${log.amount.toLocaleString()}</td>
+            <td><span class="badge ${log.type === 'renewal' ? 'badge-secondary' : 'badge-success'}">${log.type === 'renewal' ? 'ต่ออายุ' : 'ขายใหม่'}</span></td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ยังไม่มีข้อมูล CommissionLog ในเดือนนี้</td></tr>';
       }
     }
 
