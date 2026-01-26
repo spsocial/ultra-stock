@@ -2214,38 +2214,47 @@ sub2@example.com:password2"></textarea>
 
     async function loadAllCommissionData() {
       const month = document.getElementById('allCommissionMonth').value;
-      const data = await apiGet(`/api/all-admins-commission?month=${month}`);
+      const container = document.getElementById('allAdminsCommissionList');
 
-      if (data.success) {
-        // Update totals
-        document.getElementById('allTotalEarned').textContent = '฿' + data.totals.totalEarned.toLocaleString();
-        document.getElementById('allTotalPaid').textContent = '฿' + data.totals.totalPaid.toLocaleString();
-        document.getElementById('allTotalUnpaid').textContent = '฿' + data.totals.totalUnpaid.toLocaleString();
+      try {
+        const data = await apiGet(`/api/all-admins-commission?month=${month}`);
+        console.log('Commission API Response:', data);
 
-        // Render admins list
-        const container = document.getElementById('allAdminsCommissionList');
-        if (data.admins && data.admins.length > 0) {
-          container.innerHTML = data.admins.map(admin => `
-            <div style="padding:20px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:15px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;">
-                <div>
-                  <h4 style="margin:0;">${admin.adminName}</h4>
-                  <div style="display:flex;gap:20px;margin-top:10px;flex-wrap:wrap;">
-                    <span>ค่าคอม: <strong class="text-success">฿${admin.totalEarned.toLocaleString()}</strong></span>
-                    <span>จ่ายแล้ว: <strong class="text-primary">฿${admin.totalPaid.toLocaleString()}</strong></span>
-                    <span>ค้างจ่าย: <strong class="text-danger">฿${admin.unpaid.toLocaleString()}</strong></span>
-                    ${admin.bonus > 0 ? `<span>โบนัส: <strong style="color:#9333ea;">฿${admin.bonus.toLocaleString()}</strong></span>` : ''}
+        if (data.success) {
+          // Update totals
+          document.getElementById('allTotalEarned').textContent = '฿' + (data.totals?.totalEarned || 0).toLocaleString();
+          document.getElementById('allTotalPaid').textContent = '฿' + (data.totals?.totalPaid || 0).toLocaleString();
+          document.getElementById('allTotalUnpaid').textContent = '฿' + (data.totals?.totalUnpaid || 0).toLocaleString();
+
+          // Render admins list
+          if (data.admins && data.admins.length > 0) {
+            container.innerHTML = data.admins.map(admin => `
+              <div style="padding:20px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;">
+                  <div>
+                    <h4 style="margin:0;">${admin.adminName}</h4>
+                    <div style="display:flex;gap:20px;margin-top:10px;flex-wrap:wrap;">
+                      <span>ค่าคอม: <strong class="text-success">฿${admin.totalEarned.toLocaleString()}</strong></span>
+                      <span>จ่ายแล้ว: <strong class="text-primary">฿${admin.totalPaid.toLocaleString()}</strong></span>
+                      <span>ค้างจ่าย: <strong class="text-danger">฿${admin.unpaid.toLocaleString()}</strong></span>
+                      ${admin.bonus > 0 ? `<span>โบนัส: <strong style="color:#9333ea;">฿${admin.bonus.toLocaleString()}</strong></span>` : ''}
+                    </div>
                   </div>
+                  <button class="btn btn-success" onclick="showPayCommissionModal('${admin.adminId}', '${admin.adminName}', ${admin.unpaid})">
+                    💰 จ่ายค่าคอม
+                  </button>
                 </div>
-                <button class="btn btn-success" onclick="showPayCommissionModal('${admin.adminId}', '${admin.adminName}', ${admin.unpaid})">
-                  💰 จ่ายค่าคอม
-                </button>
               </div>
-            </div>
-          `).join('');
+            `).join('');
+          } else {
+            container.innerHTML = '<div class="empty-state"><div class="icon">👥</div><h3>ยังไม่มี Admin/Super Admin ที่มีค่าคอม</h3><p class="text-muted">ตรวจสอบ Role ของ Admin ใน Sheet</p></div>';
+          }
         } else {
-          container.innerHTML = '<div class="empty-state"><div class="icon">👥</div><h3>ยังไม่มี Admin/Super Admin</h3></div>';
+          container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><h3>เกิดข้อผิดพลาด</h3><p class="text-danger">${data.error || 'ไม่สามารถโหลดข้อมูลได้'}</p></div>`;
         }
+      } catch (err) {
+        console.error('Commission Error:', err);
+        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><h3>เกิดข้อผิดพลาด</h3><p class="text-danger">${err.message}</p></div>`;
       }
 
       // Also load commission log
@@ -2257,21 +2266,29 @@ sub2@example.com:password2"></textarea>
       const tbody = document.getElementById('commissionLogTable');
       tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr>';
 
-      const data = await apiGet(`/api/commission-log?month=${month}`);
+      try {
+        const data = await apiGet(`/api/commission-log?month=${month}`);
+        console.log('CommissionLog API Response:', data);
 
-      if (data.success && data.logs && data.logs.length > 0) {
-        tbody.innerHTML = data.logs.map(log => `
-          <tr>
-            <td>${formatDate(log.createdAt)}</td>
-            <td>${log.adminName}</td>
-            <td style="font-size:0.85rem;">${log.subEmail}</td>
-            <td>${log.packageDays} วัน</td>
-            <td class="text-success">฿${log.amount.toLocaleString()}</td>
-            <td><span class="badge ${log.type === 'renewal' ? 'badge-secondary' : 'badge-success'}">${log.type === 'renewal' ? 'ต่ออายุ' : 'ขายใหม่'}</span></td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ยังไม่มีข้อมูล CommissionLog ในเดือนนี้</td></tr>';
+        if (data.success && data.logs && data.logs.length > 0) {
+          tbody.innerHTML = data.logs.map(log => `
+            <tr>
+              <td>${formatDate(log.createdAt)}</td>
+              <td>${log.adminName}</td>
+              <td style="font-size:0.85rem;">${log.subEmail}</td>
+              <td>${log.packageDays} วัน</td>
+              <td class="text-success">฿${log.amount.toLocaleString()}</td>
+              <td><span class="badge ${log.type === 'renewal' ? 'badge-secondary' : 'badge-success'}">${log.type === 'renewal' ? 'ต่ออายุ' : 'ขายใหม่'}</span></td>
+            </tr>
+          `).join('');
+        } else if (data.error) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${data.error}</td></tr>`;
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">ยังไม่มีข้อมูล CommissionLog ในเดือนนี้ (month: ${month})</td></tr>`;
+        }
+      } catch (err) {
+        console.error('CommissionLog Error:', err);
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${err.message}</td></tr>`;
       }
     }
 
