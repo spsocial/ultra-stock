@@ -2203,7 +2203,10 @@ sub2@example.com:password2"></textarea>
         const now = new Date();
         for (let i = 0; i < 6; i++) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const value = d.toISOString().substring(0, 7);
+          // Use local date instead of UTC to avoid timezone issues
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const value = `${year}-${month}`;
           const label = d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
           select.innerHTML += `<option value="${value}">${label}</option>`;
         }
