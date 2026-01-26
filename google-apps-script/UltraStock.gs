@@ -1224,9 +1224,16 @@ function getCommissionLog(userId, role, month) {
       continue;
     }
 
+    // Handle Date object for createdAt
+    let createdAt = data[i][7];
+    if (createdAt instanceof Date) {
+      createdAt = createdAt.toISOString();
+    }
+    createdAt = String(createdAt || '');
+
     // Filter by month
     if (month) {
-      const logMonth = data[i][7].substring(0, 7);
+      const logMonth = createdAt.substring(0, 7);
       if (logMonth !== month) continue;
     }
 
@@ -1241,7 +1248,7 @@ function getCommissionLog(userId, role, month) {
       subEmail: data[i][4],
       packageDays: data[i][5],
       amount: amount,
-      createdAt: data[i][7]
+      createdAt: createdAt
     });
   }
 
@@ -2222,8 +2229,12 @@ function getAdminCommissionStats(data) {
 
   for (let i = 1; i < commissionData.length; i++) {
     if (commissionData[i][adminIdCol] === userId) {
-      const createdAt = commissionData[i][createdAtCol];
-      if (createdAt && createdAt.substring(0, 7) === targetMonth) {
+      let createdAt = commissionData[i][createdAtCol];
+      // Handle both Date object and String
+      if (createdAt instanceof Date) {
+        createdAt = createdAt.toISOString();
+      }
+      if (createdAt && String(createdAt).substring(0, 7) === targetMonth) {
         const amount = parseFloat(commissionData[i][amountCol]) || 0;
         totalEarned += amount;
 
@@ -2346,8 +2357,14 @@ function getCommissionLogAll(data) {
   const logs = [];
 
   for (let i = 1; i < sheetData.length; i++) {
-    const createdAt = sheetData[i][createdAtCol];
+    let createdAt = sheetData[i][createdAtCol];
     if (!createdAt) continue;
+
+    // Handle both Date object and String
+    if (createdAt instanceof Date) {
+      createdAt = createdAt.toISOString();
+    }
+    createdAt = String(createdAt);
 
     // Filter by month
     const logMonth = createdAt.substring(0, 7);
