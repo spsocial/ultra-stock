@@ -783,7 +783,8 @@ function createOrder(data) {
             subData[i][2],
             packageDays,
             commissionAmount,
-            now.toISOString()
+            now.toISOString(),
+            'sale' // Type column
           ]);
         }
 
@@ -2297,7 +2298,7 @@ function getAllAdminsCommissionStats(data) {
 
   for (let i = 1; i < adminsData.length; i++) {
     const role = adminsData[i][3]; // Role column
-    if (role === 'admin' || role === 'super_admin') {
+    if (role === 'admin' || role === 'super_admin' || role === 'owner') {
       const userId = adminsData[i][0];
       const stats = getAdminCommissionStats({ userId, month: targetMonth });
       if (stats.success) {
