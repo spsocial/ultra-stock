@@ -1457,8 +1457,9 @@ function hourlyStockReport() {
   message += `🕐 ${thaiTime}\n\n`;
 
   message += `📈 <b>ยอดขาย</b>\n`;
-  message += `• ทั้งหมด: ${stats.totalSales || 0}\n`;
-  message += `• เดือนนี้: ${stats.monthSales || 0}\n\n`;
+  message += `• วันนี้: ${stats.todaySales || 0}\n`;
+  message += `• เดือนนี้: ${stats.monthSales || 0}\n`;
+  message += `• ทั้งหมด: ${stats.totalSales || 0}\n\n`;
 
   message += `📦 <b>สต็อก</b>\n`;
   message += `• รอขาย: ${mes.totalStock || 0}\n`;
