@@ -275,6 +275,32 @@ function getUser(userId) {
   return { success: false, error: 'User not found' };
 }
 
+// Find user by ID - returns user object or null
+function findUserById(userId) {
+  const sheet = getSheet(SHEETS.ADMINS);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === userId) {
+      return {
+        id: data[i][0],
+        username: data[i][1],
+        password: data[i][2],
+        role: data[i][3],
+        permissions: tryParseJSON(data[i][4], {}),
+        commissions: tryParseJSON(data[i][5], {}),
+        balance: parseFloat(data[i][6]) || 0,
+        createdAt: data[i][7],
+        name: data[i][8] || '',
+        phone: data[i][9] || '',
+        lineId: data[i][10] || ''
+      };
+    }
+  }
+
+  return null;
+}
+
 // =============== DASHBOARD FUNCTIONS ===============
 
 function getDashboardStats(userId, role) {
