@@ -390,7 +390,7 @@ function getDashboardStats(userId, role) {
   // Count main email capacity (for owner/super_admin)
   let mainEmailStats = null;
   if (role === 'owner' || role === 'super_admin') {
-    const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
+    const { lookup: typeLookup, defaultTypeId, defaultTypeName } = getMailTypeLookup();
 
     // Count sub emails per main email (stock vs sold)
     const subStatsByMain = {};
@@ -422,8 +422,9 @@ function getDashboardStats(userId, role) {
       const id = mainEmailsData[i][0];
       const email = mainEmailsData[i][1];
       const capacity = mainEmailsData[i][3] || 50;
-      const typeId = mainEmailsData[i][6] || '';
-      const typeName = typeId ? (typeLookup[typeId] || defaultTypeName) : defaultTypeName;
+      const rawTypeId = mainEmailsData[i][6] || '';
+      const typeId = rawTypeId || defaultTypeId; // fallback ให้ของเก่าใช้ default type
+      const typeName = typeLookup[typeId] || defaultTypeName;
       const stats = subStatsByMain[id] || { stock: 0, sold: 0, total: 0 };
       const used = stats.total;
       const available = capacity - used;
@@ -438,12 +439,11 @@ function getDashboardStats(userId, role) {
       }
 
       // Aggregate by type
-      const typeKey = typeId || 'default';
-      if (!stockByTypeMap[typeKey]) {
-        stockByTypeMap[typeKey] = { typeId: typeId, typeName: typeName, stockCount: 0, soldCount: 0 };
+      if (!stockByTypeMap[typeId]) {
+        stockByTypeMap[typeId] = { typeId: typeId, typeName: typeName, stockCount: 0, soldCount: 0 };
       }
-      stockByTypeMap[typeKey].stockCount += stats.stock;
-      stockByTypeMap[typeKey].soldCount += stats.sold;
+      stockByTypeMap[typeId].stockCount += stats.stock;
+      stockByTypeMap[typeId].soldCount += stats.sold;
 
       mainEmails.push({
         id,
@@ -613,7 +613,7 @@ function getMainEmails(role) {
   const subSheet = getSheet(SHEETS.SUB_EMAILS);
   const subData = subSheet.getDataRange().getValues();
 
-  const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
+  const { lookup: typeLookup, defaultTypeId, defaultTypeName } = getMailTypeLookup();
 
   const emails = [];
 
@@ -626,8 +626,8 @@ function getMainEmails(role) {
       }
     }
 
-    const typeId = data[i][6] || '';
-    const typeName = typeId ? (typeLookup[typeId] || defaultTypeName) : defaultTypeName;
+    const typeId = data[i][6] || defaultTypeId;
+    const typeName = typeLookup[typeId] || defaultTypeName;
 
     emails.push({
       id: data[i][0],
@@ -710,7 +710,7 @@ function getSubEmails(role, status, typeId) {
   const mainSheet = getSheet(SHEETS.MAIN_EMAILS);
   const mainData = mainSheet.getDataRange().getValues();
 
-  const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
+  const { lookup: typeLookup, defaultTypeId, defaultTypeName } = getMailTypeLookup();
 
   // Create main email lookup
   const mainLookup = {};
@@ -718,7 +718,7 @@ function getSubEmails(role, status, typeId) {
     mainLookup[mainData[i][0]] = {
       email: mainData[i][1],
       password: mainData[i][2],
-      typeId: mainData[i][6] || ''
+      typeId: mainData[i][6] || defaultTypeId
     };
   }
 
@@ -732,8 +732,8 @@ function getSubEmails(role, status, typeId) {
     // Filter by typeId if provided
     if (typeId && mainEmail.typeId !== typeId) continue;
 
-    const meTypeId = mainEmail.typeId || '';
-    const meTypeName = meTypeId ? (typeLookup[meTypeId] || defaultTypeName) : defaultTypeName;
+    const meTypeId = mainEmail.typeId || defaultTypeId;
+    const meTypeName = typeLookup[meTypeId] || defaultTypeName;
 
     emails.push({
       id: data[i][0],
