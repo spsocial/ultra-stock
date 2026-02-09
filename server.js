@@ -184,6 +184,34 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
   res.json(result);
 });
 
+// ============ MAIL TYPE ROUTES (Owner & Super Admin) ============
+
+// Get Mail Types (all authenticated users can read, for buy page dropdown)
+app.get('/api/mail-types', authenticateToken, async (req, res) => {
+  const result = await callGoogleScript('getMailTypes');
+  res.json(result);
+});
+
+// Add Mail Type
+app.post('/api/mail-types', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
+  const { name } = req.body;
+  const result = await callGoogleScript('addMailType', { name });
+  res.json(result);
+});
+
+// Update Mail Type
+app.put('/api/mail-types/:id', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
+  const { name } = req.body;
+  const result = await callGoogleScript('updateMailType', { id: req.params.id, name });
+  res.json(result);
+});
+
+// Delete Mail Type
+app.delete('/api/mail-types/:id', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
+  const result = await callGoogleScript('deleteMailType', { id: req.params.id });
+  res.json(result);
+});
+
 // ============ MAIN EMAIL ROUTES (Owner & Super Admin) ============
 
 // Get Main Emails
@@ -194,22 +222,24 @@ app.get('/api/main-emails', authenticateToken, requireRole('owner', 'super_admin
 
 // Add Main Email
 app.post('/api/main-emails', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, typeId } = req.body;
   const result = await callGoogleScript('addMainEmail', {
     email,
     password,
-    createdBy: req.user.id
+    createdBy: req.user.id,
+    typeId
   });
   res.json(result);
 });
 
 // Update Main Email
 app.put('/api/main-emails/:id', authenticateToken, requireRole('owner', 'super_admin'), async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, typeId } = req.body;
   const result = await callGoogleScript('updateMainEmail', {
     id: req.params.id,
     email,
-    password
+    password,
+    typeId
   });
   res.json(result);
 });
@@ -226,7 +256,8 @@ app.delete('/api/main-emails/:id', authenticateToken, requireRole('owner', 'supe
 app.get('/api/sub-emails', authenticateToken, async (req, res) => {
   const result = await callGoogleScript('getSubEmails', {
     role: req.user.role,
-    status: req.query.status || 'stock'
+    status: req.query.status || 'stock',
+    typeId: req.query.typeId || ''
   });
   res.json(result);
 });

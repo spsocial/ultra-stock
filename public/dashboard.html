@@ -48,6 +48,9 @@
 
         <div class="nav-section" id="navStockSection" style="display:none;">
           <div class="nav-section-title">Stock Management</div>
+          <a href="#" class="nav-link" data-page="mail-types">
+            <span class="icon">🏷️</span> ประเภทหัวเมล
+          </a>
           <a href="#" class="nav-link" data-page="main-emails">
             <span class="icon">📧</span> หัวเมล
           </a>
@@ -202,6 +205,18 @@
           </div>
         </div>
 
+        <!-- Stock By Type (Owner/Super Admin only) -->
+        <div class="card" id="stockByTypeCard" style="display:none; margin-top: 20px;">
+          <div class="card-header">
+            <h3>🏷️ สต็อกแยกตามประเภท</h3>
+          </div>
+          <div class="card-body">
+            <div id="stockByTypeList" class="stats-grid">
+              <!-- Dynamic content -->
+            </div>
+          </div>
+        </div>
+
         <!-- Main Email Capacity (Owner/Super Admin only) -->
         <div class="card" id="mainEmailCapacityCard" style="display:none; margin-top: 20px;">
           <div class="card-header">
@@ -246,6 +261,14 @@
 
         <div class="card" style="max-width: 500px;">
           <div class="card-body">
+            <!-- Mail Type Selection -->
+            <div class="form-group">
+              <label>ประเภทหัวเมล</label>
+              <select class="form-control" id="buyMailType" onchange="onBuyTypeChange()">
+                <option value="">ทั้งหมด</option>
+              </select>
+            </div>
+
             <!-- Stock Available -->
             <div style="text-align:center; padding:20px; background:var(--dark); border-radius:12px; margin-bottom:20px;">
               <div style="font-size:0.9rem; color:var(--text-muted);">สต็อกพร้อมขาย</div>
@@ -281,7 +304,7 @@
                   🛒 ซื้อ (นับคอม)
                 </button>
                 <button class="btn btn-secondary" id="btnBuyStock" style="flex:1;" onclick="buyStock()">
-                  📦 ลงสต็อก
+                  🛒 ซื้อ ไม่นับคอม
                 </button>
               </div>
               <!-- For Reseller -->
@@ -341,7 +364,7 @@
             <select class="form-control" style="width:auto;" id="historyFilter" onchange="loadHistory()">
               <option value="all">ทั้งหมด</option>
               <option value="direct">ขายตรง (นับคอม)</option>
-              <option value="stock">ลงสต็อก (ไม่นับคอม)</option>
+              <option value="stock">ซื้อไม่นับคอม</option>
             </select>
           </div>
           <div class="card-body">
@@ -370,12 +393,13 @@
                   <tr>
                     <th>Email</th>
                     <th>Password</th>
+                    <th>ประเภท</th>
                     <th>Slots</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="mainEmailsTable">
-                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -402,12 +426,13 @@
                     <th>ซับเมล</th>
                     <th>Password</th>
                     <th>หัวเมล</th>
+                    <th>ประเภท</th>
                     <th>สถานะ</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="stockTable">
-                  <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                  <tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -863,6 +888,37 @@
         </div>
       </div>
 
+      <!-- Mail Types Page -->
+      <div class="page hidden" id="page-mail-types">
+        <div class="page-header flex-between">
+          <div>
+            <h2>🏷️ ประเภทหัวเมล</h2>
+            <p>จัดการประเภทหัวเมล (เช่น หัวเมลไทย 30 วัน, หัวเมลนอก 30 วัน)</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddMailTypeModal()">+ เพิ่มประเภท</button>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ชื่อประเภท</th>
+                    <th>สต็อก</th>
+                    <th>ขายแล้ว</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="mailTypesTable">
+                  <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -985,6 +1041,7 @@
         case 'buy': loadBuyPage(); break;
         case 'search': break;
         case 'history': loadHistory(); break;
+        case 'mail-types': loadMailTypes(); break;
         case 'main-emails': loadMainEmails(); break;
         case 'stock': loadStockTable(); break;
         case 'expiring': loadExpiring(); break;
@@ -1139,6 +1196,19 @@
           // Show main email capacity for owner/super_admin
           if ((user.role === 'owner' || user.role === 'super_admin') && data.stats.mainEmailStats) {
             const mes = data.stats.mainEmailStats;
+
+            // Render stock by type
+            if (mes.stockByType && mes.stockByType.length > 0) {
+              document.getElementById('stockByTypeCard').style.display = 'block';
+              document.getElementById('stockByTypeList').innerHTML = mes.stockByType.map(t => `
+                <div class="stat-card">
+                  <div class="stat-value">${t.stockCount}</div>
+                  <div class="stat-label">${t.typeName}</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);margin-top:5px;">ขายแล้ว: ${t.soldCount}</div>
+                </div>
+              `).join('');
+            }
+
             document.getElementById('mainEmailCapacityCard').style.display = 'block';
             document.getElementById('statTotalMain').textContent = mes.totalMainEmails;
             document.getElementById('statFullMain').textContent = mes.fullMainEmails;
@@ -1160,6 +1230,7 @@
                     <thead>
                       <tr>
                         <th>หัวเมล</th>
+                        <th>ประเภท</th>
                         <th>ใช้/ทั้งหมด</th>
                         <th>สต็อก</th>
                         <th>ขายแล้ว</th>
@@ -1171,6 +1242,7 @@
                       ${mes.mainEmails.map(m => `
                         <tr>
                           <td><code style="font-size:0.85rem;">${m.email}</code></td>
+                          <td><span class="badge badge-secondary">${m.typeName || '-'}</span></td>
                           <td><strong>${m.used}</strong>/${m.capacity}</td>
                           <td><span class="badge badge-warning">${m.stock}</span></td>
                           <td><span class="badge badge-success">${m.sold}</span></td>
@@ -1237,6 +1309,16 @@
     let availableStock = [];
 
     async function loadBuyPage() {
+      // Load mail types for dropdown
+      const typesData = await apiGet('/api/mail-types', false);
+      if (typesData.success) {
+        const select = document.getElementById('buyMailType');
+        select.innerHTML = '<option value="">ทั้งหมด</option>';
+        typesData.types.forEach(t => {
+          select.innerHTML += `<option value="${t.id}">${t.name}</option>`;
+        });
+      }
+
       // Load packages
       const pkgData = await apiGet('/api/packages');
       if (pkgData.success) {
@@ -1249,14 +1331,25 @@
         }
       }
 
-      // Load stock count
-      const stockData = await apiGet('/api/sub-emails?status=stock');
+      // Load stock count (with type filter if selected)
+      await loadBuyStock();
+    }
+
+    async function loadBuyStock() {
+      const typeId = document.getElementById('buyMailType')?.value || '';
+      let url = '/api/sub-emails?status=stock';
+      if (typeId) url += '&typeId=' + typeId;
+
+      const stockData = await apiGet(url);
       if (stockData.success) {
         availableStock = stockData.emails;
         document.getElementById('stockAvailable').textContent = stockData.emails.length;
-        // Set max quantity
         document.getElementById('buyQuantity').max = stockData.emails.length;
       }
+    }
+
+    function onBuyTypeChange() {
+      loadBuyStock();
     }
 
     function getPackagePrice(pkg) {
@@ -1617,7 +1710,7 @@
               <div style="display:flex;gap:15px;align-items:center;flex-wrap:wrap;">
                 <span style="font-weight:bold;">#${idx + 1}</span>
                 <span>${formatDate(order.soldAt)}</span>
-                <span class="badge ${order.saleType === 'direct' ? 'badge-success' : 'badge-secondary'}">${order.saleType === 'direct' ? 'ขายตรง' : 'ลงสต็อก'}</span>
+                <span class="badge ${order.saleType === 'direct' ? 'badge-success' : 'badge-secondary'}">${order.saleType === 'direct' ? 'ขายตรง' : 'ไม่นับคอม'}</span>
                 <span><strong>${order.items.length}</strong> เมล</span>
                 <span>${order.packageDays} วัน</span>
                 ${order.customerName ? `<span>👤 ${order.customerName}</span>` : ''}
@@ -1699,19 +1792,23 @@
           <tr>
             <td><code>${e.email}</code></td>
             <td>${e.password}</td>
+            <td><span class="badge badge-secondary">${e.typeName || '-'}</span></td>
             <td>${e.usedSlots}/${e.capacity}</td>
             <td>
-              <button class="btn btn-sm btn-secondary" onclick="editMainEmail('${e.id}', '${e.email}', '${e.password}')">แก้ไข</button>
+              <button class="btn btn-sm btn-secondary" onclick="editMainEmail('${e.id}', '${e.email}', '${e.password}', '${e.typeId || ''}')">แก้ไข</button>
               <button class="btn btn-sm btn-danger" onclick="deleteMainEmail('${e.id}')">ลบ</button>
             </td>
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีหัวเมล</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีหัวเมล</td></tr>';
       }
     }
 
-    function showAddMainEmailModal() {
+    async function showAddMainEmailModal() {
+      const typesData = await apiGet('/api/mail-types', false);
+      const typeOptions = typesData.success ? typesData.types.map(t => `<option value="${t.id}">${t.name}</option>`).join('') : '';
+
       showModal('เพิ่มหัวเมล', `
         <div class="form-group">
           <label>Email</label>
@@ -1720,6 +1817,12 @@
         <div class="form-group">
           <label>Password</label>
           <input type="text" class="form-control" id="newMainPassword" placeholder="password">
+        </div>
+        <div class="form-group">
+          <label>ประเภทหัวเมล</label>
+          <select class="form-control" id="newMainEmailType">
+            ${typeOptions}
+          </select>
         </div>
         <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
           <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
@@ -1731,13 +1834,14 @@
     async function addMainEmail() {
       const email = document.getElementById('newMainEmail').value;
       const password = document.getElementById('newMainPassword').value;
+      const typeId = document.getElementById('newMainEmailType').value;
 
       if (!email || !password) {
         showToast('กรุณากรอกข้อมูลให้ครบ', 'warning');
         return;
       }
 
-      const data = await apiPost('/api/main-emails', { email, password });
+      const data = await apiPost('/api/main-emails', { email, password, typeId });
       if (data.success) {
         showToast(data.message, 'success');
         hideModal();
@@ -1747,7 +1851,12 @@
       }
     }
 
-    function editMainEmail(id, email, password) {
+    async function editMainEmail(id, email, password, typeId) {
+      const typesData = await apiGet('/api/mail-types', false);
+      const typeOptions = typesData.success ? typesData.types.map(t =>
+        `<option value="${t.id}" ${t.id === typeId ? 'selected' : ''}>${t.name}</option>`
+      ).join('') : '';
+
       showModal('แก้ไขหัวเมล', `
         <div class="form-group">
           <label>Email</label>
@@ -1756,6 +1865,12 @@
         <div class="form-group">
           <label>Password</label>
           <input type="text" class="form-control" id="editMainPassword" value="${password}">
+        </div>
+        <div class="form-group">
+          <label>ประเภทหัวเมล</label>
+          <select class="form-control" id="editMainEmailType">
+            ${typeOptions}
+          </select>
         </div>
         <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
           <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
@@ -1767,8 +1882,9 @@
     async function updateMainEmail(id) {
       const email = document.getElementById('editMainEmail').value;
       const password = document.getElementById('editMainPassword').value;
+      const typeId = document.getElementById('editMainEmailType').value;
 
-      const data = await apiPut('/api/main-emails/' + id, { email, password });
+      const data = await apiPut('/api/main-emails/' + id, { email, password, typeId });
       if (data.success) {
         showToast(data.message, 'success');
         hideModal();
@@ -1801,6 +1917,7 @@
             <td><code>${e.email}</code></td>
             <td>${e.password}</td>
             <td>${e.mainEmail}</td>
+            <td><span class="badge badge-secondary">${e.typeName || '-'}</span></td>
             <td><span class="badge badge-warning">${e.status}</span></td>
             <td>
               <button class="btn btn-sm btn-danger" onclick="deleteSubEmail('${e.id}')">ลบ</button>
@@ -1808,7 +1925,7 @@
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ยังไม่มีสต็อก</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ยังไม่มีสต็อก</td></tr>';
       }
     }
 
@@ -2865,6 +2982,113 @@ sub2@example.com:password2"></textarea>
 
       if (data.success) {
         showToast('บันทึกข้อมูลธนาคารสำเร็จ', 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // =============== MAIL TYPES ===============
+    async function loadMailTypes() {
+      const typesData = await apiGet('/api/mail-types');
+      const tbody = document.getElementById('mailTypesTable');
+
+      if (!typesData.success) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+        return;
+      }
+
+      // Also load dashboard stats for stock counts per type
+      const dashData = await apiGet('/api/dashboard', false);
+      const stockByType = dashData?.stats?.mainEmailStats?.stockByType || [];
+
+      const types = typesData.types || [];
+      if (types.length > 0) {
+        tbody.innerHTML = types.map(t => {
+          const typeStock = stockByType.find(s => s.typeId === t.id) || { stockCount: 0, soldCount: 0 };
+          return `
+            <tr>
+              <td><strong>${t.name}</strong></td>
+              <td><span class="badge badge-warning">${typeStock.stockCount}</span></td>
+              <td><span class="badge badge-success">${typeStock.soldCount}</span></td>
+              <td>
+                <button class="btn btn-sm btn-secondary" onclick="showEditMailTypeModal('${t.id}', '${t.name}')">แก้ไข</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteMailType('${t.id}')">ลบ</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">ยังไม่มีประเภทหัวเมล</td></tr>';
+      }
+    }
+
+    function showAddMailTypeModal() {
+      showModal('เพิ่มประเภทหัวเมล', `
+        <div class="form-group">
+          <label>ชื่อประเภท</label>
+          <input type="text" class="form-control" id="newMailTypeName" placeholder="เช่น หัวเมลไทย 30 วัน">
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="addMailType()">เพิ่ม</button>
+        </div>
+      `);
+    }
+
+    async function addMailType() {
+      const name = document.getElementById('newMailTypeName').value;
+      if (!name) {
+        showToast('กรุณากรอกชื่อประเภท', 'warning');
+        return;
+      }
+
+      const data = await apiPost('/api/mail-types', { name });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadMailTypes();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    function showEditMailTypeModal(id, name) {
+      showModal('แก้ไขประเภทหัวเมล', `
+        <div class="form-group">
+          <label>ชื่อประเภท</label>
+          <input type="text" class="form-control" id="editMailTypeName" value="${name}">
+        </div>
+        <div class="modal-footer" style="padding:0;border:0;margin-top:20px;">
+          <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="updateMailType('${id}')">บันทึก</button>
+        </div>
+      `);
+    }
+
+    async function updateMailType(id) {
+      const name = document.getElementById('editMailTypeName').value;
+      if (!name) {
+        showToast('กรุณากรอกชื่อประเภท', 'warning');
+        return;
+      }
+
+      const data = await apiPut('/api/mail-types/' + id, { name });
+      if (data.success) {
+        showToast(data.message, 'success');
+        hideModal();
+        loadMailTypes();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function deleteMailType(id) {
+      if (!confirm('ยืนยันลบประเภทหัวเมลนี้?')) return;
+
+      const data = await apiDelete('/api/mail-types/' + id);
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadMailTypes();
       } else {
         showToast(data.error, 'error');
       }

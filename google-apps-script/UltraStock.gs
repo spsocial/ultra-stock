@@ -14,7 +14,8 @@ const SHEETS = {
   SETTINGS: 'Settings',
   PAYMENT_LOGS: 'PaymentLogs',       // บันทึกการชำระเงิน + SlipRef ป้องกันสลิปซ้ำ
   PENDING_ORDERS: 'PendingOrders',   // รอชำระ (สำหรับ Customer)
-  COMMISSION_PAYMENTS: 'CommissionPayments'  // บันทึกการจ่ายค่าคอมให้ Admin
+  COMMISSION_PAYMENTS: 'CommissionPayments',  // บันทึกการจ่ายค่าคอมให้ Admin
+  MAIL_TYPES: 'MailTypes'  // ประเภทหัวเมล
 };
 
 // Get Spreadsheet
@@ -39,7 +40,7 @@ function getSheet(sheetName) {
 function initializeSheet(sheet, sheetName) {
   const headers = {
     [SHEETS.ADMINS]: ['Id', 'Username', 'Password', 'Role', 'Permissions', 'Commissions', 'Balance', 'CreatedAt', 'Name', 'Phone', 'LineId'],
-    [SHEETS.MAIN_EMAILS]: ['Id', 'Email', 'Password', 'Capacity', 'CreatedAt', 'CreatedBy'],
+    [SHEETS.MAIN_EMAILS]: ['Id', 'Email', 'Password', 'Capacity', 'CreatedAt', 'CreatedBy', 'TypeId'],
     [SHEETS.SUB_EMAILS]: ['Id', 'MainEmailId', 'Email', 'Password', 'Status', 'CreatedAt', 'CreatedBy'],
     [SHEETS.ORDERS]: ['Id', 'SubEmailId', 'SubEmail', 'AdminId', 'AdminName', 'CustomerName', 'PackageDays', 'SoldAt', 'ExpiresAt', 'SaleType', 'CommissionAmount', 'Status', 'Remark', 'BatchOrderId'],
     [SHEETS.TRANSACTIONS]: ['Id', 'UserId', 'UserName', 'OrderId', 'SubEmail', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'PaidAt', 'SlipRef', 'Type'],
@@ -48,7 +49,8 @@ function initializeSheet(sheet, sheetName) {
     [SHEETS.SETTINGS]: ['Key', 'Value'],
     [SHEETS.PAYMENT_LOGS]: ['Id', 'UserId', 'UserName', 'UserRole', 'Amount', 'SlipRef', 'Status', 'VerifiedAt', 'TransactionIds'],
     [SHEETS.PENDING_ORDERS]: ['Id', 'UserId', 'UserName', 'SubEmailIds', 'PackageDays', 'Amount', 'Status', 'CreatedAt', 'ExpiresAt', 'PaidAt', 'SlipRef'],
-    [SHEETS.COMMISSION_PAYMENTS]: ['Id', 'AdminId', 'AdminName', 'Amount', 'Note', 'PaidBy', 'PaidAt', 'Month']
+    [SHEETS.COMMISSION_PAYMENTS]: ['Id', 'AdminId', 'AdminName', 'Amount', 'Note', 'PaidBy', 'PaidAt', 'Month'],
+    [SHEETS.MAIL_TYPES]: ['Id', 'Name', 'Active', 'CreatedAt', 'SortOrder']
   };
 
   if (headers[sheetName]) {
@@ -80,6 +82,12 @@ function initializeSheet(sheet, sheetName) {
       [generateId(), '30 วัน', 30, 500, 799, true]
     ];
     defaultPackages.forEach(pkg => sheet.appendRow(pkg));
+  }
+
+  // Initialize default mail types
+  if (sheetName === SHEETS.MAIL_TYPES) {
+    const defaultType = [generateId(), 'หัวเมลไทย 30 วัน', true, new Date().toISOString(), 1];
+    sheet.appendRow(defaultType);
   }
 
   // Initialize default settings
@@ -119,14 +127,20 @@ function doPost(e) {
       // Dashboard
       case 'getDashboardStats': result = getDashboardStats(data.userId, data.role); break;
 
+      // Mail Types
+      case 'getMailTypes': result = getMailTypes(); break;
+      case 'addMailType': result = addMailType(data.name); break;
+      case 'updateMailType': result = updateMailType(data.id, data.name); break;
+      case 'deleteMailType': result = deleteMailType(data.id); break;
+
       // Main Emails
       case 'getMainEmails': result = getMainEmails(data.role); break;
-      case 'addMainEmail': result = addMainEmail(data.email, data.password, data.createdBy); break;
-      case 'updateMainEmail': result = updateMainEmail(data.id, data.email, data.password); break;
+      case 'addMainEmail': result = addMainEmail(data.email, data.password, data.createdBy, data.typeId); break;
+      case 'updateMainEmail': result = updateMainEmail(data.id, data.email, data.password, data.typeId); break;
       case 'deleteMainEmail': result = deleteMainEmail(data.id); break;
 
       // Sub Emails
-      case 'getSubEmails': result = getSubEmails(data.role, data.status); break;
+      case 'getSubEmails': result = getSubEmails(data.role, data.status, data.typeId); break;
       case 'addSubEmails': result = addSubEmails(data.mainEmailId, data.emails, data.createdBy); break;
       case 'deleteSubEmail': result = deleteSubEmail(data.id); break;
       case 'searchSubEmail': result = searchSubEmail(data.email, data.role); break;
@@ -376,6 +390,8 @@ function getDashboardStats(userId, role) {
   // Count main email capacity (for owner/super_admin)
   let mainEmailStats = null;
   if (role === 'owner' || role === 'super_admin') {
+    const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
+
     // Count sub emails per main email (stock vs sold)
     const subStatsByMain = {};
     for (let i = 1; i < subEmailsData.length; i++) {
@@ -399,10 +415,15 @@ function getDashboardStats(userId, role) {
     let totalStock = 0;
     let totalSold = 0;
 
+    // Stock by type aggregation
+    const stockByTypeMap = {};
+
     for (let i = 1; i < mainEmailsData.length; i++) {
       const id = mainEmailsData[i][0];
       const email = mainEmailsData[i][1];
       const capacity = mainEmailsData[i][3] || 50;
+      const typeId = mainEmailsData[i][6] || '';
+      const typeName = typeId ? (typeLookup[typeId] || defaultTypeName) : defaultTypeName;
       const stats = subStatsByMain[id] || { stock: 0, sold: 0, total: 0 };
       const used = stats.total;
       const available = capacity - used;
@@ -416,6 +437,14 @@ function getDashboardStats(userId, role) {
         fullMainEmails++;
       }
 
+      // Aggregate by type
+      const typeKey = typeId || 'default';
+      if (!stockByTypeMap[typeKey]) {
+        stockByTypeMap[typeKey] = { typeId: typeId, typeName: typeName, stockCount: 0, soldCount: 0 };
+      }
+      stockByTypeMap[typeKey].stockCount += stats.stock;
+      stockByTypeMap[typeKey].soldCount += stats.sold;
+
       mainEmails.push({
         id,
         email,
@@ -424,7 +453,9 @@ function getDashboardStats(userId, role) {
         available,
         stock: stats.stock,
         sold: stats.sold,
-        isFull: available === 0
+        isFull: available === 0,
+        typeId: typeId,
+        typeName: typeName
       });
     }
 
@@ -435,6 +466,8 @@ function getDashboardStats(userId, role) {
       return a.available - b.available;
     });
 
+    const stockByType = Object.values(stockByTypeMap);
+
     mainEmailStats = {
       totalMainEmails,
       fullMainEmails,
@@ -442,7 +475,8 @@ function getDashboardStats(userId, role) {
       totalAvailableSlots,
       totalStock,
       totalSold,
-      mainEmails
+      mainEmails,
+      stockByType
     };
   }
 
@@ -470,6 +504,106 @@ function getDashboardStats(userId, role) {
   return { success: true, stats };
 }
 
+// =============== MAIL TYPE FUNCTIONS ===============
+
+function getMailTypes() {
+  const sheet = getSheet(SHEETS.MAIL_TYPES);
+  const data = sheet.getDataRange().getValues();
+
+  const types = [];
+  for (let i = 1; i < data.length; i++) {
+    types.push({
+      id: data[i][0],
+      name: data[i][1],
+      active: data[i][2],
+      createdAt: data[i][3],
+      sortOrder: data[i][4] || 0
+    });
+  }
+
+  types.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  return { success: true, types };
+}
+
+function addMailType(name) {
+  if (!name || !name.trim()) {
+    return { success: false, error: 'กรุณากรอกชื่อประเภท' };
+  }
+
+  const sheet = getSheet(SHEETS.MAIL_TYPES);
+  const data = sheet.getDataRange().getValues();
+
+  // Check duplicate
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === name.trim()) {
+      return { success: false, error: 'ชื่อประเภทนี้มีอยู่แล้ว' };
+    }
+  }
+
+  const id = generateId();
+  const sortOrder = data.length; // next sort order
+  sheet.appendRow([id, name.trim(), true, new Date().toISOString(), sortOrder]);
+
+  return { success: true, id, message: 'เพิ่มประเภทหัวเมลสำเร็จ' };
+}
+
+function updateMailType(id, name) {
+  if (!name || !name.trim()) {
+    return { success: false, error: 'กรุณากรอกชื่อประเภท' };
+  }
+
+  const sheet = getSheet(SHEETS.MAIL_TYPES);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      sheet.getRange(i + 1, 2).setValue(name.trim());
+      return { success: true, message: 'อัพเดทประเภทหัวเมลสำเร็จ' };
+    }
+  }
+
+  return { success: false, error: 'ไม่พบประเภทหัวเมล' };
+}
+
+function deleteMailType(id) {
+  const sheet = getSheet(SHEETS.MAIL_TYPES);
+  const data = sheet.getDataRange().getValues();
+
+  // Check if any main email uses this type
+  const mainSheet = getSheet(SHEETS.MAIN_EMAILS);
+  const mainData = mainSheet.getDataRange().getValues();
+
+  for (let i = 1; i < mainData.length; i++) {
+    if (mainData[i][6] === id) {
+      return { success: false, error: 'ไม่สามารถลบได้ เพราะมีหัวเมลใช้ประเภทนี้อยู่' };
+    }
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      return { success: true, message: 'ลบประเภทหัวเมลสำเร็จ' };
+    }
+  }
+
+  return { success: false, error: 'ไม่พบประเภทหัวเมล' };
+}
+
+// Helper: Get mail type lookup map
+function getMailTypeLookup() {
+  const sheet = getSheet(SHEETS.MAIL_TYPES);
+  const data = sheet.getDataRange().getValues();
+  const lookup = {};
+  let defaultTypeId = '';
+
+  for (let i = 1; i < data.length; i++) {
+    lookup[data[i][0]] = data[i][1];
+    if (i === 1) defaultTypeId = data[i][0]; // first type as default
+  }
+
+  return { lookup, defaultTypeId, defaultTypeName: lookup[defaultTypeId] || 'หัวเมลไทย 30 วัน' };
+}
+
 // =============== MAIN EMAIL FUNCTIONS ===============
 
 function getMainEmails(role) {
@@ -478,6 +612,8 @@ function getMainEmails(role) {
 
   const subSheet = getSheet(SHEETS.SUB_EMAILS);
   const subData = subSheet.getDataRange().getValues();
+
+  const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
 
   const emails = [];
 
@@ -490,20 +626,25 @@ function getMainEmails(role) {
       }
     }
 
+    const typeId = data[i][6] || '';
+    const typeName = typeId ? (typeLookup[typeId] || defaultTypeName) : defaultTypeName;
+
     emails.push({
       id: data[i][0],
       email: data[i][1],
       password: (role === 'owner' || role === 'super_admin') ? data[i][2] : '********',
       capacity: data[i][3] || 50,
       usedSlots: usedSlots,
-      createdAt: data[i][4]
+      createdAt: data[i][4],
+      typeId: typeId,
+      typeName: typeName
     });
   }
 
   return { success: true, emails };
 }
 
-function addMainEmail(email, password, createdBy) {
+function addMainEmail(email, password, createdBy, typeId) {
   const sheet = getSheet(SHEETS.MAIN_EMAILS);
 
   // Check duplicate
@@ -515,12 +656,12 @@ function addMainEmail(email, password, createdBy) {
   }
 
   const id = generateId();
-  sheet.appendRow([id, email, password, 50, new Date().toISOString(), createdBy]);
+  sheet.appendRow([id, email, password, 50, new Date().toISOString(), createdBy, typeId || '']);
 
   return { success: true, id, message: 'เพิ่มหัวเมลสำเร็จ' };
 }
 
-function updateMainEmail(id, email, password) {
+function updateMainEmail(id, email, password, typeId) {
   const sheet = getSheet(SHEETS.MAIN_EMAILS);
   const data = sheet.getDataRange().getValues();
 
@@ -528,6 +669,7 @@ function updateMainEmail(id, email, password) {
     if (data[i][0] === id) {
       if (email) sheet.getRange(i + 1, 2).setValue(email);
       if (password) sheet.getRange(i + 1, 3).setValue(password);
+      if (typeId !== undefined) sheet.getRange(i + 1, 7).setValue(typeId || '');
       return { success: true, message: 'อัพเดทหัวเมลสำเร็จ' };
     }
   }
@@ -561,19 +703,22 @@ function deleteMainEmail(id) {
 
 // =============== SUB EMAIL FUNCTIONS ===============
 
-function getSubEmails(role, status) {
+function getSubEmails(role, status, typeId) {
   const sheet = getSheet(SHEETS.SUB_EMAILS);
   const data = sheet.getDataRange().getValues();
 
   const mainSheet = getSheet(SHEETS.MAIN_EMAILS);
   const mainData = mainSheet.getDataRange().getValues();
 
+  const { lookup: typeLookup, defaultTypeName } = getMailTypeLookup();
+
   // Create main email lookup
   const mainLookup = {};
   for (let i = 1; i < mainData.length; i++) {
     mainLookup[mainData[i][0]] = {
       email: mainData[i][1],
-      password: mainData[i][2]
+      password: mainData[i][2],
+      typeId: mainData[i][6] || ''
     };
   }
 
@@ -584,6 +729,12 @@ function getSubEmails(role, status) {
 
     const mainEmail = mainLookup[data[i][1]] || {};
 
+    // Filter by typeId if provided
+    if (typeId && mainEmail.typeId !== typeId) continue;
+
+    const meTypeId = mainEmail.typeId || '';
+    const meTypeName = meTypeId ? (typeLookup[meTypeId] || defaultTypeName) : defaultTypeName;
+
     emails.push({
       id: data[i][0],
       mainEmailId: data[i][1],
@@ -592,7 +743,9 @@ function getSubEmails(role, status) {
       email: data[i][2],
       password: data[i][3],
       status: data[i][4],
-      createdAt: data[i][5]
+      createdAt: data[i][5],
+      typeId: meTypeId,
+      typeName: meTypeName
     });
   }
 
